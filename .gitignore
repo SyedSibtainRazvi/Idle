@@ -1,0 +1,13 @@
+# Xcode
+Idle.xcodeproj/
+xcuserdata/
+DerivedData/
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Build
+build/
