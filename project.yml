@@ -1,0 +1,98 @@
+name: Idle
+options:
+  minimumXcodeGenVersion: 2.44.1
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: com.idle.terminal
+    MACOSX_DEPLOYMENT_TARGET: 14.0
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+targets:
+  Idle:
+    type: application
+    platform: macOS
+    deploymentTarget: '14.0'
+    sources:
+      - path: App
+      - path: Views
+      - path: Services
+      - path: Resources
+        excludes:
+          - Info.plist
+    dependencies:
+      - framework: GhosttyKit.xcframework
+        embed: false
+    entitlements:
+      path: Resources/Idle.entitlements
+    settings:
+      base:
+        SWIFT_OBJC_BRIDGING_HEADER: Idle-Bridging-Header.h
+        ENABLE_HARDENED_RUNTIME: YES
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-lc++"
+          - "-framework"
+          - Metal
+          - "-framework"
+          - QuartzCore
+          - "-framework"
+          - IOSurface
+          - "-framework"
+          - UniformTypeIdentifiers
+          - "-framework"
+          - Carbon
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+        Release:
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Idle
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSQuitAlwaysKeepsWindows: false
+    postBuildScripts:
+      - name: Copy Ghostty Resources
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          GHOSTTY_SRC="${SRCROOT}/third_party/ghostty/zig-out/share/ghostty"
+          TERMINFO_SRC="${SRCROOT}/third_party/ghostty/zig-out/share/terminfo"
+
+          if [ ! -d "$GHOSTTY_SRC" ]; then
+            echo "error: Ghostty resources not found at $GHOSTTY_SRC" >&2
+            echo "error: Build GhosttyKit first (see setup instructions)." >&2
+            exit 1
+          fi
+
+          if [ ! -d "$TERMINFO_SRC" ]; then
+            echo "error: Ghostty terminfo not found at $TERMINFO_SRC" >&2
+            echo "error: Build GhosttyKit first (see setup instructions)." >&2
+            exit 1
+          fi
+
+          mkdir -p "$DEST/ghostty"
+          rsync -a --delete "$GHOSTTY_SRC/" "$DEST/ghostty/"
+
+          mkdir -p "$DEST/terminfo"
+          rsync -a --delete "$TERMINFO_SRC/" "$DEST/terminfo/"
+  IdleTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: '14.0'
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Idle
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
