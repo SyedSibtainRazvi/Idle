@@ -80,4 +80,7 @@ xcodebuild -project Idle.xcodeproj -scheme IdleTests test
 
 ## License
 
-See individual files and `third_party/` for licensing. Ghostty is MIT-licensed.
+Idle is licensed under **AGPL-3.0-or-later**. See [LICENSE](LICENSE).
+
+Third-party licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+Ghostty (libghostty) is MIT-licensed.
