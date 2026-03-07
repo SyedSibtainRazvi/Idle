@@ -42,18 +42,18 @@ If you're running a prebuilt release (`.zip` or `.dmg`):
    # Build & Run (Cmd+R)
    ```
 
-## Learning Panel
+## Idle Learning
 
 The sidebar includes an AI-powered learning panel that generates interactive quiz questions from your Claude Code sessions.
 
-- **Off by default.** Learning only activates when you explicitly toggle it on.
+- **Off by default.** Idle Learning only activates when you explicitly toggle it on.
 - **Uses your local Claude CLI.** When enabled, Idle calls `claude --print` using your local Claude installation and account. No separate API key is needed.
 - **Sends recent terminal context.** The active session's recent terminal output is sent to Claude to generate relevant questions. Only the active session is read; other tabs are not accessed.
 - **Token usage is visible.** Estimated input/output token counts are shown in the panel footer so you can track usage.
 
 ### How it works
 
-1. Toggle the **Learning** switch in the sidebar. A consent dialog explains what data is sent.
+1. Toggle the **Idle Learning** switch in the sidebar. A consent dialog explains what data is sent.
 2. Idle detects Claude Code by monitoring the terminal process title for the word "claude". Detection is heuristic and title-based — see limitations below.
 3. When Claude is detected, the panel reads recent terminal output to classify the session phase (thinking vs. executing).
 4. During thinking phases, context is sent to Claude to generate MCQ quiz questions about the concepts being discussed.
@@ -66,10 +66,17 @@ The sidebar includes an AI-powered learning panel that generates interactive qui
 
 ## Signing
 
-Both configs are set in `project.yml` and emitted into the generated Xcode project:
+Both configs default to ad-hoc signing so anyone can build from source:
 
-- **Debug**: ad-hoc signed (`CODE_SIGN_IDENTITY = "-"`). Sufficient for local development.
-- **Release**: `CODE_SIGN_IDENTITY = "Developer ID Application"`. To notarise, set your `DEVELOPMENT_TEAM` in Xcode or via an `xcconfig` overlay.
+- **Debug**: `CODE_SIGN_IDENTITY = "-"`
+- **Release**: `CODE_SIGN_IDENTITY = "-"`
+
+To produce a notarised release build, override the signing identity and team on your own machine (e.g. via an `xcconfig` overlay or Xcode build settings):
+
+```
+CODE_SIGN_IDENTITY = Developer ID Application
+DEVELOPMENT_TEAM = <your team ID>
+```
 
 ## Tests
 

@@ -663,7 +663,7 @@ final class LearningPanelView: NSView {
     addSubview(headerView)
 
     headerLabel.translatesAutoresizingMaskIntoConstraints = false
-    headerLabel.stringValue = "Learning"
+    headerLabel.stringValue = "Idle Learning"
     headerLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
     headerLabel.textColor = IdleTheme.headerText
     headerLabel.backgroundColor = .clear

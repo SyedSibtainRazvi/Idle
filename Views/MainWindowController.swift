@@ -422,7 +422,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     }
 
     let alert = NSAlert()
-    alert.messageText = "Enable Learning?"
+    alert.messageText = "Enable Idle Learning?"
     alert.informativeText = "Idle will use your local Claude CLI/account to generate learning insights. Recent terminal context from this session may be sent to Claude, which may consume Claude tokens. Token usage is shown in the learning panel."
     alert.alertStyle = .informational
     alert.addButton(withTitle: "Enable")
