@@ -444,8 +444,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     let session = sessions[activeSessionIndex]
     let processTitle = session.processTitle
     let workingDir = session.workingDirectory
-    weak var view = session.terminalView
-    claudeDetector.titleDidChange(processTitle, workingDirectory: workingDir) {
+    let view = session.terminalView
+    claudeDetector.titleDidChange(processTitle, workingDirectory: workingDir) { [weak view] in
       return view?.readViewportText()
     }
   }
