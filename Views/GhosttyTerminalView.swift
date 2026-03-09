@@ -288,6 +288,49 @@ final class GhosttyTerminalView: NSView, NSTextInputClient {
     if lastPressureStage < 2 { lastPressureStage = event.stage }
   }
 
+  // MARK: - Context Menu
+
+  override func menu(for event: NSEvent) -> NSMenu? {
+    let menu = NSMenu()
+    menu.addItem(withTitle: "Copy", action: #selector(copySelection), keyEquivalent: "")
+    menu.addItem(withTitle: "Paste", action: #selector(pasteClipboard), keyEquivalent: "")
+    menu.addItem(.separator())
+    menu.addItem(withTitle: "Select All", action: #selector(selectAllText), keyEquivalent: "")
+    menu.addItem(.separator())
+    menu.addItem(withTitle: "Clear", action: #selector(clearTerminal), keyEquivalent: "")
+    for item in menu.items where item.action != nil {
+      item.target = self
+    }
+    return menu
+  }
+
+  @objc private func copySelection() {
+    guard let surface else { return }
+    var textResult = ghostty_text_s()
+    guard ghostty_surface_read_selection(surface, &textResult) else { return }
+    defer { ghostty_surface_free_text(surface, &textResult) }
+    guard let textPtr = textResult.text else { return }
+    let copied = String(cString: textPtr)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(copied, forType: .string)
+  }
+
+  @objc private func pasteClipboard() {
+    paste(nil)
+  }
+
+  @objc private func selectAllText() {
+    guard let surface else { return }
+    let cmd = "select_all"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  @objc private func clearTerminal() {
+    guard let surface else { return }
+    let cmd = "clear_screen"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
   // MARK: - Viewport Text
 
   func readViewportText() -> String? {

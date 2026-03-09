@@ -6,6 +6,8 @@ extension Notification.Name {
   static let ghosttySetTitle = Notification.Name("GhosttySetTitle")
   static let ghosttyPWD = Notification.Name("GhosttyPWD")
   static let ghosttyCloseSurface = Notification.Name("GhosttyCloseSurface")
+  static let ghosttySearchTotal = Notification.Name("GhosttySearchTotal")
+  static let ghosttySearchSelected = Notification.Name("GhosttySearchSelected")
 }
 
 // MARK: - Runtime
@@ -123,6 +125,45 @@ private func onAction(
   case GHOSTTY_ACTION_MOUSE_SHAPE:
     let shape = action.action.mouse_shape
     DispatchQueue.main.async { setCursorForShape(shape) }
+    return true
+
+  case GHOSTTY_ACTION_SEARCH_TOTAL:
+    let total = action.action.search_total.total
+    let view = terminalViewFromTarget(target)
+    DispatchQueue.main.async {
+      NotificationCenter.default.post(
+        name: .ghosttySearchTotal,
+        object: view,
+        userInfo: ["total": Int(total)]
+      )
+    }
+    return true
+
+  case GHOSTTY_ACTION_SEARCH_SELECTED:
+    let selected = action.action.search_selected.selected
+    let view = terminalViewFromTarget(target)
+    DispatchQueue.main.async {
+      NotificationCenter.default.post(
+        name: .ghosttySearchSelected,
+        object: view,
+        userInfo: ["selected": Int(selected)]
+      )
+    }
+    return true
+
+  case GHOSTTY_ACTION_OPEN_URL:
+    guard let urlPtr = action.action.open_url.url else { return false }
+    let urlString = String(cString: urlPtr)
+    DispatchQueue.main.async {
+      // If it looks like a file path, convert to file URL
+      let url: URL?
+      if let candidate = URL(string: urlString), candidate.scheme != nil {
+        url = candidate
+      } else {
+        url = URL(fileURLWithPath: urlString)
+      }
+      if let url { NSWorkspace.shared.open(url) }
+    }
     return true
 
   case GHOSTTY_ACTION_RENDER:

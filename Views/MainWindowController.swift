@@ -31,6 +31,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
   private var sessionCounter = 0
   private var isClosingSession = false
 
+  // Search bar (floating overlay)
+  private let searchBar = SearchBarView()
+  private var isSearchBarVisible = false
+
+  // Closed sessions (for reopen)
+  private var closedSessions: [(label: String, workingDirectory: String)] = []
+  private let maxClosedSessions = 10
+
   // Learning panel
   private let learningPanel = LearningPanelView()
   private let learningPanelWrapper = NSView()
@@ -44,6 +52,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
   private var titleObserver: NSObjectProtocol?
   private var closeObserver: NSObjectProtocol?
   private var pwdObserver: NSObjectProtocol?
+  private var searchTotalObserver: NSObjectProtocol?
+  private var searchSelectedObserver: NSObjectProtocol?
   private var enterFullScreenObserver: NSObjectProtocol?
   private var exitFullScreenObserver: NSObjectProtocol?
 
@@ -159,6 +169,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     terminalContainer.layer?.backgroundColor = NSColor.black.cgColor
     contentView.addSubview(terminalContainer)
 
+    // Search bar — floating overlay inside terminal container
+    searchBar.translatesAutoresizingMaskIntoConstraints = false
+    searchBar.isHidden = true
+    terminalContainer.addSubview(searchBar)
+
     // ── Learning panel (right side) ──
 
     // Learning panel divider
@@ -209,6 +224,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       headerDivider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
       headerDivider.heightAnchor.constraint(equalToConstant: 1),
 
+      // Search bar — floating overlay in top-right of terminal container
+      searchBar.topAnchor.constraint(equalTo: terminalContainer.topAnchor, constant: 8),
+      searchBar.trailingAnchor.constraint(equalTo: terminalContainer.trailingAnchor, constant: -8),
+
       // Sidebar wrapper — below header
       sidebarWrapper.topAnchor.constraint(equalTo: headerDivider.bottomAnchor),
       sidebarWrapper.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -227,7 +246,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       sidebarDivider.leadingAnchor.constraint(equalTo: sidebarWrapper.trailingAnchor),
       sidebarDivider.widthAnchor.constraint(equalToConstant: 1),
 
-      // Terminal container — between sidebar divider and learning panel divider
+      // Terminal container — directly below header
       terminalContainer.topAnchor.constraint(equalTo: headerDivider.bottomAnchor),
       terminalContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
       terminalContainer.leadingAnchor.constraint(equalTo: sidebarDivider.trailingAnchor),
@@ -284,6 +303,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
         self.saveCurrentLearningState()
       }
     }
+    // Search bar callbacks
+    searchBar.onSearch = { [weak self] query in
+      self?.performSearch(query: query)
+    }
+    searchBar.onNext = { [weak self] in
+      self?.searchNext()
+    }
+    searchBar.onPrev = { [weak self] in
+      self?.searchPrev()
+    }
+    searchBar.onClose = { [weak self] in
+      self?.hideSearchBar()
+    }
+
     observeNotifications()
     observeFullScreen()
 
@@ -312,6 +345,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     if let pwdObserver {
       NotificationCenter.default.removeObserver(pwdObserver)
       self.pwdObserver = nil
+    }
+    if let searchTotalObserver {
+      NotificationCenter.default.removeObserver(searchTotalObserver)
+      self.searchTotalObserver = nil
+    }
+    if let searchSelectedObserver {
+      NotificationCenter.default.removeObserver(searchSelectedObserver)
+      self.searchSelectedObserver = nil
     }
     if let enterFullScreenObserver {
       NotificationCenter.default.removeObserver(enterFullScreenObserver)
@@ -544,7 +585,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     let terminalView = GhosttyTerminalView(workingDirectory: workingDirectory)
     terminalView.translatesAutoresizingMaskIntoConstraints = false
     terminalView.isHidden = true
-    terminalContainer.addSubview(terminalView)
+    terminalContainer.addSubview(terminalView, positioned: .below, relativeTo: searchBar)
 
     NSLayoutConstraint.activate([
       terminalView.topAnchor.constraint(equalTo: terminalContainer.topAnchor),
@@ -629,6 +670,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     isClosingSession = true
     defer { isClosingSession = false }
 
+    // Save session info for reopen before destroying
+    let session = sessions[index]
+    let closedInfo = (label: session.label, workingDirectory: session.workingDirectory)
+    closedSessions.append(closedInfo)
+    if closedSessions.count > maxClosedSessions {
+      closedSessions.removeFirst()
+    }
+
     // Last session — tear down and close window
     if sessions.count == 1 {
       removeAllObservers()
@@ -642,7 +691,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       return
     }
 
-    let session = sessions[index]
     session.terminalView?.destroySurface()
     session.terminalView?.removeFromSuperview()
     sessions.remove(at: index)
@@ -745,6 +793,84 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     return branch?.isEmpty == true ? nil : branch
   }
 
+  // MARK: - Search
+
+  func toggleSearchBar() {
+    if isSearchBarVisible {
+      hideSearchBar()
+    } else {
+      showSearchBar()
+    }
+  }
+
+  private func showSearchBar() {
+    guard !isSearchBarVisible else {
+      searchBar.focusSearchField()
+      return
+    }
+    isSearchBarVisible = true
+    searchBar.isHidden = false
+    searchBar.alphaValue = 0
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0.15
+      searchBar.animator().alphaValue = 1
+    }
+    searchBar.focusSearchField()
+  }
+
+  private func hideSearchBar() {
+    guard isSearchBarVisible else { return }
+    isSearchBarVisible = false
+    NSAnimationContext.runAnimationGroup({ context in
+      context.duration = 0.15
+      searchBar.animator().alphaValue = 0
+    }, completionHandler: { [weak self] in
+      self?.searchBar.isHidden = true
+    })
+    searchBar.clear()
+
+    // Clear search highlighting in Ghostty
+    if let surface = sessions[safe: activeSessionIndex]?.terminalView?.surface {
+      let cmd = "search:"
+      _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+    }
+
+    // Return focus to terminal
+    if let view = sessions[safe: activeSessionIndex]?.terminalView {
+      window?.makeFirstResponder(view)
+    }
+  }
+
+  private func performSearch(query: String) {
+    guard let surface = sessions[safe: activeSessionIndex]?.terminalView?.surface else { return }
+    let cmd = "search:\(query)"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  private func searchNext() {
+    guard let surface = sessions[safe: activeSessionIndex]?.terminalView?.surface else { return }
+    let cmd = "search:next"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  private func searchPrev() {
+    guard let surface = sessions[safe: activeSessionIndex]?.terminalView?.surface else { return }
+    let cmd = "search:previous"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  // MARK: - Reopen closed session
+
+  func reopenClosedSession() {
+    guard let closed = closedSessions.popLast() else { return }
+    addSession(workingDirectory: closed.workingDirectory)
+    // Restore the label
+    if sessions.indices.contains(activeSessionIndex) {
+      sessions[activeSessionIndex].label = closed.label
+      sidebar.updateSession(at: activeSessionIndex, with: sessions[activeSessionIndex])
+    }
+  }
+
   // MARK: - Running status
 
   private func updateRunningStatus(for index: Int, title: String) {
@@ -817,6 +943,26 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
           self.claudeDetector.updateWorkingDirectory(pwd)
         }
       }
+    }
+
+    searchTotalObserver = NotificationCenter.default.addObserver(
+      forName: .ghosttySearchTotal,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard let self, self.isSearchBarVisible else { return }
+      guard let total = notification.userInfo?["total"] as? Int else { return }
+      self.searchBar.updateMatchCount(total: total, selected: 0)
+    }
+
+    searchSelectedObserver = NotificationCenter.default.addObserver(
+      forName: .ghosttySearchSelected,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard let self, self.isSearchBarVisible else { return }
+      guard let selected = notification.userInfo?["selected"] as? Int else { return }
+      self.searchBar.updateMatchCount(total: self.searchBar.totalMatches, selected: selected)
     }
   }
 

@@ -100,6 +100,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let fileMenu = NSMenu(title: "File")
     fileMenu.addItem(withTitle: "New Session", action: #selector(handleNewSession), keyEquivalent: "t")
     fileMenu.addItem(withTitle: "Close Session", action: #selector(handleCloseSession), keyEquivalent: "w")
+    let reopenItem = fileMenu.addItem(withTitle: "Reopen Closed Session", action: #selector(handleReopenClosedSession), keyEquivalent: "t")
+    reopenItem.keyEquivalentModifierMask = [.command, .shift]
     fileItem.submenu = fileMenu
     mainMenu.addItem(fileItem)
 
@@ -109,8 +111,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     editMenu.addItem(withTitle: "Copy", action: #selector(handleCopy), keyEquivalent: "c")
     editMenu.addItem(withTitle: "Paste", action: #selector(handlePaste), keyEquivalent: "v")
     editMenu.addItem(withTitle: "Select All", action: #selector(handleSelectAll), keyEquivalent: "a")
+    editMenu.addItem(.separator())
+    editMenu.addItem(withTitle: "Find…", action: #selector(handleFind), keyEquivalent: "f")
     editItem.submenu = editMenu
     mainMenu.addItem(editItem)
+
+    // View menu
+    let viewItem = NSMenuItem()
+    let viewMenu = NSMenu(title: "View")
+    let increaseItem = viewMenu.addItem(withTitle: "Increase Font Size", action: #selector(handleIncreaseFontSize), keyEquivalent: "+")
+    increaseItem.keyEquivalentModifierMask = [.command]
+    let decreaseItem = viewMenu.addItem(withTitle: "Decrease Font Size", action: #selector(handleDecreaseFontSize), keyEquivalent: "-")
+    decreaseItem.keyEquivalentModifierMask = [.command]
+    let resetItem = viewMenu.addItem(withTitle: "Reset Font Size", action: #selector(handleResetFontSize), keyEquivalent: "0")
+    resetItem.keyEquivalentModifierMask = [.command]
+    viewItem.submenu = viewMenu
+    mainMenu.addItem(viewItem)
 
     // Window menu
     let windowItem = NSMenuItem()
@@ -191,6 +207,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     guard let surface = locateActiveTerminal()?.surface else { return }
     let cmd = "select_all"
     _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  @objc private func handleFind(_ sender: Any?) {
+    activeMainWindowController?.toggleSearchBar()
+  }
+
+  @objc private func handleIncreaseFontSize(_ sender: Any?) {
+    guard let surface = locateActiveTerminal()?.surface else { return }
+    let cmd = "increase_font_size:1"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  @objc private func handleDecreaseFontSize(_ sender: Any?) {
+    guard let surface = locateActiveTerminal()?.surface else { return }
+    let cmd = "decrease_font_size:1"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  @objc private func handleResetFontSize(_ sender: Any?) {
+    guard let surface = locateActiveTerminal()?.surface else { return }
+    let cmd = "reset_font_size"
+    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  @objc private func handleReopenClosedSession(_ sender: Any?) {
+    activeMainWindowController?.reopenClosedSession()
   }
 
   // MARK: - Helpers
