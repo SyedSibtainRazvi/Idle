@@ -622,8 +622,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     claudeDetector.stopMonitoring()
     learningEngine.stop()
 
-    // Dismiss search bar when switching to a different session
-    if index != activeSessionIndex && isSearchBarVisible {
+    // Dismiss search bar only when the actual session identity changes
+    // (not just when the numeric index shifts due to a background tab close)
+    let oldSessionID = sessions[safe: activeSessionIndex]?.id
+    let newSessionID = sessions[safe: index]?.id
+    if oldSessionID != newSessionID && isSearchBarVisible {
       hideSearchBar()
     }
 
