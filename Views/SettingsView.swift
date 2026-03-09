@@ -26,18 +26,29 @@ final class SettingsView: NSView {
     "Monaco",
   ]
 
+  // scrollback-limit is in bytes in Ghostty (default 10 MB)
   private let scrollbackOptions: [(label: String, value: Int)] = [
-    ("1,000", 1_000),
-    ("5,000", 5_000),
-    ("10,000", 10_000),
-    ("50,000", 50_000),
-    ("100,000", 100_000),
-    ("Unlimited", 10_000_000),
+    ("1 MB", 1_000_000),
+    ("5 MB", 5_000_000),
+    ("10 MB (default)", 10_000_000),
+    ("25 MB", 25_000_000),
+    ("50 MB", 50_000_000),
+    ("100 MB", 100_000_000),
   ]
+
+  private var settingsObserver: NSObjectProtocol?
+  private var isRefreshing = false
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
     setup()
+    settingsObserver = NotificationCenter.default.addObserver(
+      forName: .idleSettingsDidChange,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.refreshValues()
+    }
   }
 
   @available(*, unavailable)
@@ -45,7 +56,15 @@ final class SettingsView: NSView {
     fatalError("init(coder:) has not been implemented")
   }
 
+  deinit {
+    if let settingsObserver {
+      NotificationCenter.default.removeObserver(settingsObserver)
+    }
+  }
+
   func refreshValues() {
+    isRefreshing = true
+    defer { isRefreshing = false }
     let mgr = SettingsManager.shared
 
     // Font family
@@ -82,7 +101,7 @@ final class SettingsView: NSView {
     if let idx = scrollbackOptions.firstIndex(where: { $0.value == mgr.scrollbackLines }) {
       scrollbackPopup.selectItem(at: idx)
     } else {
-      scrollbackPopup.selectItem(at: scrollbackOptions.count - 1) // Unlimited
+      scrollbackPopup.selectItem(at: 2) // 10 MB default
     }
   }
 
@@ -267,7 +286,7 @@ final class SettingsView: NSView {
     for opt in scrollbackOptions {
       scrollbackPopup.addItem(withTitle: opt.label)
     }
-    scrollbackPopup.selectItem(at: scrollbackOptions.count - 1) // Unlimited default
+    scrollbackPopup.selectItem(at: 2) // 10 MB default default
     scrollbackPopup.target = self
     scrollbackPopup.action = #selector(settingChanged)
     (scrollbackPopup.cell as? NSPopUpButtonCell)?.controlSize = .small
@@ -321,6 +340,7 @@ final class SettingsView: NSView {
   }
 
   private func applyCurrentSettings() {
+    guard !isRefreshing else { return }
     let selectedFont = fontFamilyPopup.titleOfSelectedItem ?? "System Default"
     let family = selectedFont == "System Default" ? "" : selectedFont
 
