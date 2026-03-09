@@ -627,16 +627,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       }
     }
 
-    // Stop detector/engine for the old session
-    claudeDetector.stopMonitoring()
-    learningEngine.stop()
-
-    // Dismiss search bar only when the actual session identity changes
-    // (not just when the numeric index shifts due to a background tab close)
     let oldSessionID = previousSessionID ?? sessions[safe: activeSessionIndex]?.id
     let newSessionID = sessions[safe: index]?.id
-    if oldSessionID != newSessionID && isSearchBarVisible {
-      hideSearchBar()
+    let sessionChanged = oldSessionID != newSessionID
+
+    // Only stop detector/engine and dismiss search when the visible session actually changes
+    if sessionChanged {
+      claudeDetector.stopMonitoring()
+      learningEngine.stop()
+
+      if isSearchBarVisible {
+        hideSearchBar()
+      }
     }
 
     // Hide current (find by identity if activeSessionIndex is stale)
@@ -648,7 +650,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     } else {
       oldView = nil
     }
-    oldView?.isHidden = true
+    if sessionChanged { oldView?.isHidden = true }
 
     activeSessionIndex = index
 
