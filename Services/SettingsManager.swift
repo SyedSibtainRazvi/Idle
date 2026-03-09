@@ -77,7 +77,7 @@ final class SettingsManager {
   func configString() -> String {
     var lines: [String] = []
     if !fontFamily.isEmpty {
-      lines.append("font-family = \(fontFamily)")
+      lines.append("font-family = \"\(fontFamily)\"")
     }
     lines.append("font-size = \(Int(fontSize))")
     lines.append("cursor-style = \(cursorStyle.rawValue)")

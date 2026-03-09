@@ -279,7 +279,19 @@ final class SettingsView: NSView {
 
   private func setupScrollbackRow() {
     let scrollLabel = makeLabel("Scrollback")
+    scrollLabel.toolTip = "Applies to new sessions only"
     addSubview(scrollLabel)
+
+    let hintLabel = NSTextField()
+    hintLabel.translatesAutoresizingMaskIntoConstraints = false
+    hintLabel.stringValue = "Applies to new sessions"
+    hintLabel.font = NSFont.systemFont(ofSize: 10, weight: .regular)
+    hintLabel.textColor = NSColor(white: 0.45, alpha: 1)
+    hintLabel.backgroundColor = .clear
+    hintLabel.isBordered = false
+    hintLabel.isEditable = false
+    hintLabel.isSelectable = false
+    addSubview(hintLabel)
 
     scrollbackPopup.translatesAutoresizingMaskIntoConstraints = false
     scrollbackPopup.removeAllItems()
@@ -301,6 +313,9 @@ final class SettingsView: NSView {
       scrollbackPopup.centerYAnchor.constraint(equalTo: scrollLabel.centerYAnchor),
       scrollbackPopup.leadingAnchor.constraint(equalTo: scrollLabel.trailingAnchor, constant: 4),
       scrollbackPopup.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+
+      hintLabel.topAnchor.constraint(equalTo: scrollLabel.bottomAnchor, constant: 4),
+      hintLabel.leadingAnchor.constraint(equalTo: scrollLabel.leadingAnchor),
     ])
   }
 
