@@ -136,6 +136,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     viewMenu.addItem(.separator())
     let themeItem = viewMenu.addItem(withTitle: "Theme…", action: #selector(handleThemePicker), keyEquivalent: "k")
     themeItem.keyEquivalentModifierMask = [.command]
+    if let paletteImage = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: "Theme") {
+      themeItem.image = paletteImage
+    }
     viewItem.submenu = viewMenu
     mainMenu.addItem(viewItem)
 
@@ -225,21 +228,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   @objc private func handleIncreaseFontSize(_ sender: Any?) {
-    guard let surface = locateActiveTerminal()?.surface else { return }
-    let cmd = "increase_font_size:1"
-    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+    SettingsManager.shared.adjustFontSize(by: 1)
   }
 
   @objc private func handleDecreaseFontSize(_ sender: Any?) {
-    guard let surface = locateActiveTerminal()?.surface else { return }
-    let cmd = "decrease_font_size:1"
-    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+    SettingsManager.shared.adjustFontSize(by: -1)
   }
 
   @objc private func handleResetFontSize(_ sender: Any?) {
-    guard let surface = locateActiveTerminal()?.surface else { return }
-    let cmd = "reset_font_size"
-    _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+    SettingsManager.shared.resetFontSize()
   }
 
   @objc private func handleReopenClosedSession(_ sender: Any?) {

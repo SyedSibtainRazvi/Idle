@@ -185,24 +185,8 @@ final class ThemeManager {
     // Update app chrome colors
     updateIdleTheme(from: theme)
 
-    guard let app = GhosttyRuntime.shared.app else { return }
-
-    // Write theme to temp file, load into a new config, and apply
-    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("idle-theme.conf")
-    do {
-      try theme.toGhosttyConfig().write(to: tempURL, atomically: true, encoding: .utf8)
-    } catch {
-      NSLog("[Idle] Failed to write theme config: %@", error.localizedDescription)
-      return
-    }
-
-    guard let newCfg = ghostty_config_new() else { return }
-    tempURL.path.withCString { ghostty_config_load_file(newCfg, $0) }
-    ghostty_config_finalize(newCfg)
-    ghostty_app_update_config(app, newCfg)
-    ghostty_config_free(newCfg)
-
-    try? FileManager.default.removeItem(at: tempURL)
+    // Apply combined theme + settings config via the shared composer
+    IdleConfigComposer.applyAll()
 
     NotificationCenter.default.post(name: .idleThemeDidChange, object: nil)
   }

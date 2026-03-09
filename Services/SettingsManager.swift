@@ -18,6 +18,38 @@ enum CursorStyle: String, CaseIterable {
   }
 }
 
+// MARK: - Unified config composer
+
+/// Composes a single Ghostty config from both theme and settings,
+/// preventing partial configs from overwriting each other.
+enum IdleConfigComposer {
+  static func applyAll() {
+    guard let app = GhosttyRuntime.shared.app else { return }
+
+    let themeConfig = ThemeManager.shared.selectedTheme.toGhosttyConfig()
+    let settingsConfig = SettingsManager.shared.configString()
+    let combined = themeConfig + settingsConfig
+
+    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("idle-config.conf")
+    do {
+      try combined.write(to: tempURL, atomically: true, encoding: .utf8)
+    } catch {
+      NSLog("[Idle] Failed to write combined config: %@", error.localizedDescription)
+      return
+    }
+
+    guard let newCfg = ghostty_config_new() else { return }
+    tempURL.path.withCString { ghostty_config_load_file(newCfg, $0) }
+    ghostty_config_finalize(newCfg)
+    ghostty_app_update_config(app, newCfg)
+    ghostty_config_free(newCfg)
+
+    try? FileManager.default.removeItem(at: tempURL)
+  }
+}
+
+// MARK: - SettingsManager
+
 final class SettingsManager {
   static let shared = SettingsManager()
 
@@ -41,6 +73,19 @@ final class SettingsManager {
     scrollbackLines = UserDefaults.standard.object(forKey: Self.scrollbackLinesKey) as? Int ?? 10_000_000
   }
 
+  /// Returns the settings portion of the Ghostty config (no theme keys).
+  func configString() -> String {
+    var lines: [String] = []
+    if !fontFamily.isEmpty {
+      lines.append("font-family = \(fontFamily)")
+    }
+    lines.append("font-size = \(Int(fontSize))")
+    lines.append("cursor-style = \(cursorStyle.rawValue)")
+    lines.append("cursor-style-blink = \(cursorBlink)")
+    lines.append("scrollback-limit = \(scrollbackLines)")
+    return lines.joined(separator: "\n") + "\n"
+  }
+
   func applySettings(
     fontFamily: String,
     fontSize: Double,
@@ -53,14 +98,25 @@ final class SettingsManager {
     self.cursorStyle = cursorStyle
     self.cursorBlink = cursorBlink
     self.scrollbackLines = scrollbackLines
+    persistAll()
+    IdleConfigComposer.applyAll()
+    NotificationCenter.default.post(name: .idleSettingsDidChange, object: nil)
+  }
 
-    UserDefaults.standard.set(fontFamily, forKey: Self.fontFamilyKey)
-    UserDefaults.standard.set(fontSize, forKey: Self.fontSizeKey)
-    UserDefaults.standard.set(cursorStyle.rawValue, forKey: Self.cursorStyleKey)
-    UserDefaults.standard.set(cursorBlink, forKey: Self.cursorBlinkKey)
-    UserDefaults.standard.set(scrollbackLines, forKey: Self.scrollbackLinesKey)
+  /// Adjust font size by a delta (e.g. +1 or -1) and apply globally.
+  func adjustFontSize(by delta: Double) {
+    fontSize = max(8, min(32, fontSize + delta))
+    persistAll()
+    IdleConfigComposer.applyAll()
+    NotificationCenter.default.post(name: .idleSettingsDidChange, object: nil)
+  }
 
-    applyToGhostty()
+  /// Reset font size to 14 and apply globally.
+  func resetFontSize() {
+    fontSize = 14.0
+    persistAll()
+    IdleConfigComposer.applyAll()
+    NotificationCenter.default.post(name: .idleSettingsDidChange, object: nil)
   }
 
   func applyPersistedSettings() {
@@ -70,38 +126,14 @@ final class SettingsManager {
       && cursorBlink == true
       && scrollbackLines == 10_000_000
     guard !isDefault else { return }
-    applyToGhostty()
+    IdleConfigComposer.applyAll()
   }
 
-  private func applyToGhostty() {
-    guard let app = GhosttyRuntime.shared.app else { return }
-
-    var lines: [String] = []
-    if !fontFamily.isEmpty {
-      lines.append("font-family = \(fontFamily)")
-    }
-    lines.append("font-size = \(Int(fontSize))")
-    lines.append("cursor-style = \(cursorStyle.rawValue)")
-    lines.append("cursor-style-blink = \(cursorBlink)")
-    lines.append("scrollback-limit = \(scrollbackLines)")
-
-    let configStr = lines.joined(separator: "\n") + "\n"
-    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("idle-settings.conf")
-    do {
-      try configStr.write(to: tempURL, atomically: true, encoding: .utf8)
-    } catch {
-      NSLog("[Idle] Failed to write settings config: %@", error.localizedDescription)
-      return
-    }
-
-    guard let newCfg = ghostty_config_new() else { return }
-    tempURL.path.withCString { ghostty_config_load_file(newCfg, $0) }
-    ghostty_config_finalize(newCfg)
-    ghostty_app_update_config(app, newCfg)
-    ghostty_config_free(newCfg)
-
-    try? FileManager.default.removeItem(at: tempURL)
-
-    NotificationCenter.default.post(name: .idleSettingsDidChange, object: nil)
+  private func persistAll() {
+    UserDefaults.standard.set(fontFamily, forKey: Self.fontFamilyKey)
+    UserDefaults.standard.set(fontSize, forKey: Self.fontSizeKey)
+    UserDefaults.standard.set(cursorStyle.rawValue, forKey: Self.cursorStyleKey)
+    UserDefaults.standard.set(cursorBlink, forKey: Self.cursorBlinkKey)
+    UserDefaults.standard.set(scrollbackLines, forKey: Self.scrollbackLinesKey)
   }
 }
