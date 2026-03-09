@@ -3,15 +3,40 @@ import AppKit
 // MARK: - Shared constants
 
 enum IdleTheme {
-  static let bgColor = NSColor(srgbRed: 0.067, green: 0.067, blue: 0.075, alpha: 1)         // #111113
-  static let dividerColor = NSColor(srgbRed: 0.16, green: 0.16, blue: 0.175, alpha: 1)       // #29292D
-  static let headerText = NSColor(white: 0.55, alpha: 1)
-  static let activeRowBg = NSColor(srgbRed: 0.18, green: 0.18, blue: 0.20, alpha: 1)          // #2E2E33
-  static let hoverRowBg = NSColor(srgbRed: 0.125, green: 0.125, blue: 0.14, alpha: 1)         // #202024
-  static let inactiveRowBg = NSColor(srgbRed: 0.098, green: 0.098, blue: 0.11, alpha: 1)      // #19191C
-  static let accentColor = NSColor(srgbRed: 0.40, green: 0.56, blue: 1.0, alpha: 1)           // #668FFF
-  static let secondaryText = NSColor(white: 0.48, alpha: 1)
-  static let primaryText = NSColor(white: 0.92, alpha: 1)
+  /// Base background color derived from the active terminal theme.
+  static var bgColor: NSColor { currentBg }
+  static var dividerColor: NSColor { currentBg.blending(fraction: 0.12, of: .white) }
+  static var headerText: NSColor { currentFg.withAlphaComponent(0.6) }
+  static var activeRowBg: NSColor { currentBg.blending(fraction: 0.10, of: .white) }
+  static var hoverRowBg: NSColor { currentBg.blending(fraction: 0.06, of: .white) }
+  static var inactiveRowBg: NSColor { currentBg.blending(fraction: 0.02, of: .white) }
+  static var accentColor: NSColor { currentAccent }
+  static var secondaryText: NSColor { currentFg.withAlphaComponent(0.5) }
+  static var primaryText: NSColor { currentFg.withAlphaComponent(0.92) }
+
+  // Backing storage — updated by ThemeManager
+  private(set) static var currentBg = NSColor(srgbRed: 0.067, green: 0.067, blue: 0.075, alpha: 1)
+  private(set) static var currentFg = NSColor(white: 0.92, alpha: 1)
+  private(set) static var currentAccent = NSColor(srgbRed: 0.40, green: 0.56, blue: 1.0, alpha: 1)
+
+  static func update(background: NSColor, foreground: NSColor, accent: NSColor) {
+    currentBg = background
+    currentFg = foreground
+    currentAccent = accent
+  }
+}
+
+extension NSColor {
+  /// Blend toward another color by a fraction (0 = self, 1 = other).
+  func blending(fraction: CGFloat, of other: NSColor) -> NSColor {
+    guard let s = usingColorSpace(.sRGB), let o = other.usingColorSpace(.sRGB) else { return self }
+    return NSColor(
+      srgbRed: s.redComponent + (o.redComponent - s.redComponent) * fraction,
+      green: s.greenComponent + (o.greenComponent - s.greenComponent) * fraction,
+      blue: s.blueComponent + (o.blueComponent - s.blueComponent) * fraction,
+      alpha: 1
+    )
+  }
 }
 
 enum IdleConstants {

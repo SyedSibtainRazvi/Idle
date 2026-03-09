@@ -67,10 +67,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
   private let fullScreenLeading: CGFloat = 12
   private let shellNames: Set<String> = ["zsh", "bash", "fish", "sh", "dash", "csh", "tcsh", "ksh"]
 
-  // Colors (from shared theme)
-  private let headerBg = IdleTheme.bgColor
-  private let dividerColor = IdleTheme.dividerColor
-  private let headerText = IdleTheme.headerText
+  private var themeObserver: NSObjectProtocol?
 
   init() {
     let initialRect = NSRect(x: 0, y: 0, width: 900, height: 600)
@@ -103,7 +100,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     // ── Header bar (full width, always visible) ──
     headerBar.translatesAutoresizingMaskIntoConstraints = false
     headerBar.wantsLayer = true
-    headerBar.layer?.backgroundColor = headerBg.cgColor
+    headerBar.layer?.backgroundColor = IdleTheme.bgColor.cgColor
     contentView.addSubview(headerBar)
 
     // Toggle sidebar button
@@ -123,7 +120,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     titleLabel.translatesAutoresizingMaskIntoConstraints = false
     titleLabel.stringValue = "Idle"
     titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-    titleLabel.textColor = headerText
+    titleLabel.textColor = IdleTheme.headerText
     titleLabel.backgroundColor = .clear
     titleLabel.isBordered = false
     titleLabel.isEditable = false
@@ -146,7 +143,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     // Header divider
     headerDivider.translatesAutoresizingMaskIntoConstraints = false
     headerDivider.wantsLayer = true
-    headerDivider.layer?.backgroundColor = dividerColor.cgColor
+    headerDivider.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
     contentView.addSubview(headerDivider)
 
     // ── Body: sidebar + divider + terminal ──
@@ -164,7 +161,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     // Divider between sidebar and terminal
     sidebarDivider.translatesAutoresizingMaskIntoConstraints = false
     sidebarDivider.wantsLayer = true
-    sidebarDivider.layer?.backgroundColor = dividerColor.cgColor
+    sidebarDivider.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
     contentView.addSubview(sidebarDivider)
 
     // Terminal container fills the rest
@@ -188,7 +185,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     // Learning panel divider
     learningPanelDivider.translatesAutoresizingMaskIntoConstraints = false
     learningPanelDivider.wantsLayer = true
-    learningPanelDivider.layer?.backgroundColor = dividerColor.cgColor
+    learningPanelDivider.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
     learningPanelDivider.isHidden = true
     contentView.addSubview(learningPanelDivider)
 
@@ -335,6 +332,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
 
     observeNotifications()
     observeFullScreen()
+    observeThemeChanges()
 
     // Start with one session at home directory
     addSession(workingDirectory: IdleConstants.homeDirectory)
@@ -377,6 +375,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     if let exitFullScreenObserver {
       NotificationCenter.default.removeObserver(exitFullScreenObserver)
       self.exitFullScreenObserver = nil
+    }
+    if let themeObserver {
+      NotificationCenter.default.removeObserver(themeObserver)
+      self.themeObserver = nil
     }
   }
 
@@ -1071,6 +1073,30 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       guard let self else { return }
       self.toggleLeadingConstraint.constant = self.trafficLightLeading
     }
+  }
+
+  // MARK: - Theme changes
+
+  private func observeThemeChanges() {
+    themeObserver = NotificationCenter.default.addObserver(
+      forName: .idleThemeDidChange,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.refreshThemeColors()
+    }
+  }
+
+  private func refreshThemeColors() {
+    headerBar.layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    headerDivider.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
+    sidebarDivider.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
+    learningPanelDivider.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
+    titleLabel.textColor = IdleTheme.headerText
+    window?.backgroundColor = IdleTheme.bgColor
+    terminalContainer.layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    sidebar.refreshColors()
+    learningPanel.refreshColors()
   }
 
   // MARK: - NSWindowDelegate

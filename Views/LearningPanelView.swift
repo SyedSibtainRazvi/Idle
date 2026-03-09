@@ -938,6 +938,21 @@ final class LearningPanelView: NSView {
     onClose?()
   }
 
+  func refreshColors() {
+    layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    headerView.layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    headerLabel.textColor = IdleTheme.headerText
+    statusLabel.textColor = IdleTheme.secondaryText
+    disclosureLabel.textColor = IdleTheme.secondaryText
+    progressLabel.textColor = IdleTheme.accentColor
+    scoreLabel.textColor = IdleTheme.accentColor
+    completionLabel.textColor = IdleTheme.accentColor
+    emptyLabel.textColor = IdleTheme.secondaryText
+    tokenFooter.layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    tokenFooterDivider.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
+    tokenFooterLabel.textColor = IdleTheme.secondaryText
+  }
+
   private func applyLearningEnabled(_ enabled: Bool, animated: Bool, updateSwitch: Bool) {
     isLearningEnabled = enabled
     if updateSwitch {

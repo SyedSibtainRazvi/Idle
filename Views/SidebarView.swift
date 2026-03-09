@@ -29,15 +29,7 @@ final class SidebarView: NSView {
   private static let cellIdentifier = NSUserInterfaceItemIdentifier("SessionCell")
   private static let rowIdentifier = NSUserInterfaceItemIdentifier("SessionRow")
 
-  // Colors (from shared theme)
-  private let bgColor = IdleTheme.bgColor
-  private let activeRowBg = IdleTheme.activeRowBg
-  private let hoverRowBg = IdleTheme.hoverRowBg
-  private let inactiveRowBg = IdleTheme.inactiveRowBg
-  private let accentColor = IdleTheme.accentColor
-  private let secondaryText = IdleTheme.secondaryText
-  private let dividerColor = IdleTheme.dividerColor
-  private let bottomBarBg = IdleTheme.bgColor
+  // Colors — read from IdleTheme dynamically
 
   // Dimensions
   private let rowHeight: CGFloat = 62
@@ -55,7 +47,7 @@ final class SidebarView: NSView {
 
   private func setupViews() {
     wantsLayer = true
-    layer?.backgroundColor = bgColor.cgColor
+    layer?.backgroundColor = IdleTheme.bgColor.cgColor
 
     // Table view
     let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("SessionColumn"))
@@ -91,13 +83,13 @@ final class SidebarView: NSView {
     // Divider line between table and bottom bar
     dividerLine.translatesAutoresizingMaskIntoConstraints = false
     dividerLine.wantsLayer = true
-    dividerLine.layer?.backgroundColor = dividerColor.cgColor
+    dividerLine.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
     addSubview(dividerLine)
 
     // Bottom bar with new session button
     bottomBar.translatesAutoresizingMaskIntoConstraints = false
     bottomBar.wantsLayer = true
-    bottomBar.layer?.backgroundColor = bottomBarBg.cgColor
+    bottomBar.layer?.backgroundColor = IdleTheme.bgColor.cgColor
     addSubview(bottomBar)
 
     newSessionButton.translatesAutoresizingMaskIntoConstraints = false
@@ -110,7 +102,7 @@ final class SidebarView: NSView {
     newSessionButton.layer?.borderWidth = 0.5
     newSessionButton.layer?.borderColor = NSColor(white: 1, alpha: 0.08).cgColor
     newSessionButton.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-    newSessionButton.contentTintColor = secondaryText
+    newSessionButton.contentTintColor = IdleTheme.secondaryText
     newSessionButton.target = self
     newSessionButton.action = #selector(newSessionClicked(_:))
     newSessionButton.setAccessibilityLabel("New Session")
@@ -171,6 +163,14 @@ final class SidebarView: NSView {
     sessions[index] = session
     tableView.reloadData(forRowIndexes: IndexSet(integer: index), columnIndexes: IndexSet(integer: 0))
   }
+
+  func refreshColors() {
+    layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    bottomBar.layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    dividerLine.layer?.backgroundColor = IdleTheme.dividerColor.cgColor
+    newSessionButton.contentTintColor = IdleTheme.secondaryText
+    tableView.reloadData()
+  }
 }
 
 // MARK: - NSTableViewDataSource
@@ -221,7 +221,7 @@ extension SidebarView: NSTableViewDelegate {
       reused.updateActive(isActive)
       return reused
     }
-    return SessionTableRowView(isActive: isActive, activeColor: activeRowBg, inactiveColor: inactiveRowBg, hoverColor: hoverRowBg, accentColor: accentColor)
+    return SessionTableRowView(isActive: isActive, activeColor: IdleTheme.activeRowBg, inactiveColor: IdleTheme.inactiveRowBg, hoverColor: IdleTheme.hoverRowBg, accentColor: IdleTheme.accentColor)
   }
 
   func tableViewSelectionDidChange(_ notification: Notification) {
@@ -323,8 +323,8 @@ final class SessionRowView: NSTableCellView, NSTextFieldDelegate {
   private var isActiveRow = false
   private var trackingArea: NSTrackingArea?
 
-  private let primaryText = IdleTheme.primaryText
-  private let secondaryText = IdleTheme.secondaryText
+  private var primaryText: NSColor { IdleTheme.primaryText }
+  private var secondaryText: NSColor { IdleTheme.secondaryText }
   private let runningDotColor = NSColor(srgbRed: 0.24, green: 0.80, blue: 0.44, alpha: 1)
   private let idleDotColor = NSColor(white: 1.0, alpha: 0.30)
 

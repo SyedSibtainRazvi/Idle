@@ -1,5 +1,9 @@
 import AppKit
 
+extension Notification.Name {
+  static let idleThemeDidChange = Notification.Name("IdleThemeDidChange")
+}
+
 struct TerminalTheme {
   let name: String
   let background: String
@@ -178,6 +182,9 @@ final class ThemeManager {
     selectedThemeName = theme.name
     UserDefaults.standard.set(theme.name, forKey: Self.selectedThemeKey)
 
+    // Update app chrome colors
+    updateIdleTheme(from: theme)
+
     guard let app = GhosttyRuntime.shared.app else { return }
 
     // Write theme to temp file, load into a new config, and apply
@@ -196,13 +203,32 @@ final class ThemeManager {
     ghostty_config_free(newCfg)
 
     try? FileManager.default.removeItem(at: tempURL)
+
+    NotificationCenter.default.post(name: .idleThemeDidChange, object: nil)
   }
 
   /// Apply the persisted theme. Called once at startup after surfaces are created.
   func applyPersistedTheme() {
     let theme = selectedTheme
-    // Skip if it's the default — terminal.conf already has Idle Dark
+    updateIdleTheme(from: theme)
     guard theme.name != "Idle Dark" else { return }
     applyTheme(theme)
+  }
+
+  private func updateIdleTheme(from theme: TerminalTheme) {
+    let bg = Self.colorFromHex(theme.background)
+    let fg = Self.colorFromHex(theme.foreground)
+    let accent = Self.colorFromHex(theme.palette[4]) // blue
+    IdleTheme.update(background: bg, foreground: fg, accent: accent)
+  }
+
+  static func colorFromHex(_ hex: String) -> NSColor {
+    let hex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+    var rgb: UInt64 = 0
+    Scanner(string: hex).scanHexInt64(&rgb)
+    let r = CGFloat((rgb >> 16) & 0xFF) / 255
+    let g = CGFloat((rgb >> 8) & 0xFF) / 255
+    let b = CGFloat(rgb & 0xFF) / 255
+    return NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
   }
 }
