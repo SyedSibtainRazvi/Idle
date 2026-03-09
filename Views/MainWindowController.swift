@@ -622,6 +622,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     claudeDetector.stopMonitoring()
     learningEngine.stop()
 
+    // Dismiss search bar when switching to a different session
+    if index != activeSessionIndex && isSearchBarVisible {
+      hideSearchBar()
+    }
+
     // Hide current
     if sessions.indices.contains(activeSessionIndex),
        let oldView = sessions[activeSessionIndex].terminalView {
@@ -951,6 +956,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       queue: .main
     ) { [weak self] notification in
       guard let self, self.isSearchBarVisible else { return }
+      guard let view = notification.object as? GhosttyTerminalView,
+            view === self.sessions[safe: self.activeSessionIndex]?.terminalView else { return }
       guard let total = notification.userInfo?["total"] as? Int else { return }
       self.searchBar.updateMatchCount(total: total, selected: 0)
     }
@@ -961,6 +968,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       queue: .main
     ) { [weak self] notification in
       guard let self, self.isSearchBarVisible else { return }
+      guard let view = notification.object as? GhosttyTerminalView,
+            view === self.sessions[safe: self.activeSessionIndex]?.terminalView else { return }
       guard let selected = notification.userInfo?["selected"] as? Int else { return }
       self.searchBar.updateMatchCount(total: self.searchBar.totalMatches, selected: selected)
     }
