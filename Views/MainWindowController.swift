@@ -609,7 +609,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     refreshGitBranch(for: sessions.count - 1)
   }
 
-  private func selectSession(at index: Int, saveCurrentState: Bool = true) {
+  private func selectSession(at index: Int, saveCurrentState: Bool = true, previousSessionID: UUID? = nil) {
     dispatchPrecondition(condition: .onQueue(.main))
     guard sessions.indices.contains(index) else { return }
 
@@ -624,7 +624,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
 
     // Dismiss search bar only when the actual session identity changes
     // (not just when the numeric index shifts due to a background tab close)
-    let oldSessionID = sessions[safe: activeSessionIndex]?.id
+    let oldSessionID = previousSessionID ?? sessions[safe: activeSessionIndex]?.id
     let newSessionID = sessions[safe: index]?.id
     if oldSessionID != newSessionID && isSearchBarVisible {
       hideSearchBar()
@@ -699,6 +699,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       return
     }
 
+    // Capture the active session ID before mutating the array so selectSession
+    // can correctly determine whether the visible session actually changed.
+    let activeIDBeforeClose = sessions[safe: activeSessionIndex]?.id
+
     session.terminalView?.destroySurface()
     session.terminalView?.removeFromSuperview()
     sessions.remove(at: index)
@@ -715,7 +719,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       newIndex = activeSessionIndex
     }
 
-    selectSession(at: newIndex, saveCurrentState: activeSessionIndex != index)
+    selectSession(at: newIndex, saveCurrentState: activeSessionIndex != index, previousSessionID: activeIDBeforeClose)
   }
 
   // MARK: - Public API (AppDelegate compat)
