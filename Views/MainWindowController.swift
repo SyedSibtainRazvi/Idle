@@ -39,6 +39,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
   private let themePicker = ThemePickerView()
   private var isThemePickerVisible = false
 
+  // Settings panel (floating overlay)
+  private let settingsPanel = SettingsView()
+  private var isSettingsPanelVisible = false
+
   // Closed sessions (for reopen)
   private var closedSessions: [(label: String, workingDirectory: String)] = []
   private let maxClosedSessions = 10
@@ -180,6 +184,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     themePicker.isHidden = true
     terminalContainer.addSubview(themePicker)
 
+    // Settings panel — floating overlay, centered in terminal container
+    settingsPanel.translatesAutoresizingMaskIntoConstraints = false
+    settingsPanel.isHidden = true
+    terminalContainer.addSubview(settingsPanel)
+
     // ── Learning panel (right side) ──
 
     // Learning panel divider
@@ -240,6 +249,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       themePicker.widthAnchor.constraint(equalToConstant: 280),
       themePicker.heightAnchor.constraint(equalToConstant: 420),
 
+      // Settings panel — floating overlay, centered horizontally, near top
+      settingsPanel.centerXAnchor.constraint(equalTo: terminalContainer.centerXAnchor),
+      settingsPanel.topAnchor.constraint(equalTo: terminalContainer.topAnchor, constant: 20),
+      settingsPanel.widthAnchor.constraint(equalToConstant: 340),
+      settingsPanel.heightAnchor.constraint(equalToConstant: 320),
+
       // Sidebar wrapper — below header
       sidebarWrapper.topAnchor.constraint(equalTo: headerDivider.bottomAnchor),
       sidebarWrapper.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -298,6 +313,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     learningEngine.delegate = self
     learningPanel.onClose = { [weak self] in self?.toggleLearningPanel() }
     themePicker.onClose = { [weak self] in self?.hideThemePicker() }
+    settingsPanel.onClose = { [weak self] in self?.hideSettingsPanel() }
     learningPanel.shouldToggleLearning = { [weak self] enabled in
       guard let self else { return false }
       return !enabled || self.confirmLearningEnableIfNeeded()
@@ -917,6 +933,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
 
   private func showThemePicker() {
     guard !isThemePickerVisible else { return }
+    if isSettingsPanelVisible { hideSettingsPanel() }
     isThemePickerVisible = true
     themePicker.refreshSelection()
     themePicker.isHidden = false
@@ -935,6 +952,44 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       themePicker.animator().alphaValue = 0
     }, completionHandler: { [weak self] in
       self?.themePicker.isHidden = true
+    })
+
+    if let view = sessions[safe: activeSessionIndex]?.terminalView {
+      window?.makeFirstResponder(view)
+    }
+  }
+
+  // MARK: - Settings panel
+
+  func toggleSettingsPanel() {
+    if isSettingsPanelVisible {
+      hideSettingsPanel()
+    } else {
+      showSettingsPanel()
+    }
+  }
+
+  private func showSettingsPanel() {
+    guard !isSettingsPanelVisible else { return }
+    if isThemePickerVisible { hideThemePicker() }
+    isSettingsPanelVisible = true
+    settingsPanel.refreshValues()
+    settingsPanel.isHidden = false
+    settingsPanel.alphaValue = 0
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0.15
+      settingsPanel.animator().alphaValue = 1
+    }
+  }
+
+  private func hideSettingsPanel() {
+    guard isSettingsPanelVisible else { return }
+    isSettingsPanelVisible = false
+    NSAnimationContext.runAnimationGroup({ context in
+      context.duration = 0.15
+      settingsPanel.animator().alphaValue = 0
+    }, completionHandler: { [weak self] in
+      self?.settingsPanel.isHidden = true
     })
 
     if let view = sessions[safe: activeSessionIndex]?.terminalView {

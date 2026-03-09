@@ -458,7 +458,7 @@ final class GhosttyTerminalView: NSView, NSTextInputClient {
       macos: ghostty_platform_macos_s(nsview: Unmanaged.passUnretained(self).toOpaque())
     )
     cfg.scale_factor = resolveScaleFactor()
-    cfg.font_size = 14.0
+    cfg.font_size = Float(SettingsManager.shared.fontSize)
     cfg.context = GHOSTTY_SURFACE_CONTEXT_WINDOW
 
     let cwd = workingDirectory

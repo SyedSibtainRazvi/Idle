@@ -16,9 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     mainWindowController = controller
     controller.showWindow(nil)
 
-    // Apply saved theme (deferred so surfaces are initialized first)
+    // Apply saved theme and settings (deferred so surfaces are initialized first)
     DispatchQueue.main.async {
       ThemeManager.shared.applyPersistedTheme()
+      SettingsManager.shared.applyPersistedSettings()
     }
 
     notifyFocusChange(focused: true)
@@ -90,6 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let appItem = NSMenuItem()
     let appMenu = NSMenu()
     appMenu.addItem(withTitle: "About Idle", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+    appMenu.addItem(.separator())
+    appMenu.addItem(withTitle: "Settings…", action: #selector(handleSettings), keyEquivalent: ",")
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Hide Idle", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
@@ -245,6 +248,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   @objc private func handleThemePicker(_ sender: Any?) {
     activeMainWindowController?.toggleThemePicker()
+  }
+
+  @objc private func handleSettings(_ sender: Any?) {
+    activeMainWindowController?.toggleSettingsPanel()
   }
 
   // MARK: - Helpers
