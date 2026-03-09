@@ -219,7 +219,9 @@ final class LearningEngine {
           return path
         }
       }
-    } catch {}
+    } catch {
+      NSLog("[Idle] Failed to locate claude binary: %@", error.localizedDescription)
+    }
 
     return nil
   }

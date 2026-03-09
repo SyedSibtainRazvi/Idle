@@ -181,8 +181,11 @@ private func onReadClipboard(
   _ state: UnsafeMutableRawPointer?
 ) {
   guard let surfaceUserdata else { return }
+  // Resolve the view synchronously so Swift ARC retains it before the async
+  // dispatch. Deferring takeUnretainedValue() into the async block risks a
+  // use-after-free if destroySurface() runs on main thread before execution.
+  let view = Unmanaged<GhosttyTerminalView>.fromOpaque(surfaceUserdata).takeUnretainedValue()
   DispatchQueue.main.async {
-    let view = Unmanaged<GhosttyTerminalView>.fromOpaque(surfaceUserdata).takeUnretainedValue()
     guard let surface = view.surface else { return }
     let content = NSPasteboard.general.string(forType: .string) ?? ""
     content.withCString { ptr in
@@ -199,11 +202,11 @@ private func onConfirmReadClipboard(
   _ request: ghostty_clipboard_request_e
 ) {
   guard let surfaceUserdata else { return }
-  // Capture the C string synchronously before it can be freed.
+  // Capture C data synchronously before pointers can be freed.
   let captured = value.map { String(cString: $0) }
+  let view = Unmanaged<GhosttyTerminalView>.fromOpaque(surfaceUserdata).takeUnretainedValue()
 
   DispatchQueue.main.async {
-    let view = Unmanaged<GhosttyTerminalView>.fromOpaque(surfaceUserdata).takeUnretainedValue()
     guard let surface = view.surface else { return }
 
     let text = captured ?? NSPasteboard.general.string(forType: .string) ?? ""
