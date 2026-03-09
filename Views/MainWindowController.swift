@@ -613,9 +613,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     dispatchPrecondition(condition: .onQueue(.main))
     guard sessions.indices.contains(index) else { return }
 
-    // Save learning state + pending questions from current session
-    if saveCurrentState, sessions.indices.contains(activeSessionIndex) {
-      saveCurrentLearningState()
+    // Save learning state + pending questions from current session.
+    // Use previousSessionID to find the session by identity when the array
+    // has already been mutated and activeSessionIndex may be out of bounds.
+    if saveCurrentState {
+      if let prevID = previousSessionID,
+         let prevIndex = sessions.firstIndex(where: { $0.id == prevID }) {
+        var state = learningPanel.currentLearningState()
+        state.pendingQuestions = pendingQuestions
+        sessions[prevIndex].learningState = state
+      } else if sessions.indices.contains(activeSessionIndex) {
+        saveCurrentLearningState()
+      }
     }
 
     // Stop detector/engine for the old session
@@ -630,11 +639,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       hideSearchBar()
     }
 
-    // Hide current
-    if sessions.indices.contains(activeSessionIndex),
-       let oldView = sessions[activeSessionIndex].terminalView {
-      oldView.isHidden = true
+    // Hide current (find by identity if activeSessionIndex is stale)
+    let oldView: GhosttyTerminalView?
+    if let prevID = previousSessionID {
+      oldView = sessions.first(where: { $0.id == prevID })?.terminalView
+    } else if sessions.indices.contains(activeSessionIndex) {
+      oldView = sessions[activeSessionIndex].terminalView
+    } else {
+      oldView = nil
     }
+    oldView?.isHidden = true
 
     activeSessionIndex = index
 
