@@ -35,6 +35,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
   private let searchBar = SearchBarView()
   private var isSearchBarVisible = false
 
+  // Theme picker (floating overlay)
+  private let themePicker = ThemePickerView()
+  private var isThemePickerVisible = false
+
   // Closed sessions (for reopen)
   private var closedSessions: [(label: String, workingDirectory: String)] = []
   private let maxClosedSessions = 10
@@ -174,6 +178,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     searchBar.isHidden = true
     terminalContainer.addSubview(searchBar)
 
+    // Theme picker — floating overlay, centered in terminal container
+    themePicker.translatesAutoresizingMaskIntoConstraints = false
+    themePicker.isHidden = true
+    terminalContainer.addSubview(themePicker)
+
     // ── Learning panel (right side) ──
 
     // Learning panel divider
@@ -227,6 +236,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       // Search bar — floating overlay in top-right of terminal container
       searchBar.topAnchor.constraint(equalTo: terminalContainer.topAnchor, constant: 8),
       searchBar.trailingAnchor.constraint(equalTo: terminalContainer.trailingAnchor, constant: -8),
+
+      // Theme picker — floating overlay, centered horizontally, near top
+      themePicker.centerXAnchor.constraint(equalTo: terminalContainer.centerXAnchor),
+      themePicker.topAnchor.constraint(equalTo: terminalContainer.topAnchor, constant: 20),
+      themePicker.widthAnchor.constraint(equalToConstant: 280),
+      themePicker.heightAnchor.constraint(equalToConstant: 420),
 
       // Sidebar wrapper — below header
       sidebarWrapper.topAnchor.constraint(equalTo: headerDivider.bottomAnchor),
@@ -285,6 +300,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     claudeDetector.delegate = self
     learningEngine.delegate = self
     learningPanel.onClose = { [weak self] in self?.toggleLearningPanel() }
+    themePicker.onClose = { [weak self] in self?.hideThemePicker() }
     learningPanel.shouldToggleLearning = { [weak self] enabled in
       guard let self else { return false }
       return !enabled || self.confirmLearningEnableIfNeeded()
@@ -885,6 +901,43 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     guard let surface = sessions[safe: activeSessionIndex]?.terminalView?.surface else { return }
     let cmd = "search:previous"
     _ = ghostty_surface_binding_action(surface, cmd, UInt(cmd.utf8.count))
+  }
+
+  // MARK: - Theme picker
+
+  func toggleThemePicker() {
+    if isThemePickerVisible {
+      hideThemePicker()
+    } else {
+      showThemePicker()
+    }
+  }
+
+  private func showThemePicker() {
+    guard !isThemePickerVisible else { return }
+    isThemePickerVisible = true
+    themePicker.refreshSelection()
+    themePicker.isHidden = false
+    themePicker.alphaValue = 0
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0.15
+      themePicker.animator().alphaValue = 1
+    }
+  }
+
+  private func hideThemePicker() {
+    guard isThemePickerVisible else { return }
+    isThemePickerVisible = false
+    NSAnimationContext.runAnimationGroup({ context in
+      context.duration = 0.15
+      themePicker.animator().alphaValue = 0
+    }, completionHandler: { [weak self] in
+      self?.themePicker.isHidden = true
+    })
+
+    if let view = sessions[safe: activeSessionIndex]?.terminalView {
+      window?.makeFirstResponder(view)
+    }
   }
 
   // MARK: - Reopen closed session

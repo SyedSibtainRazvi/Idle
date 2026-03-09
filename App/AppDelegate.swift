@@ -16,6 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     mainWindowController = controller
     controller.showWindow(nil)
 
+    // Apply saved theme (deferred so surfaces are initialized first)
+    DispatchQueue.main.async {
+      ThemeManager.shared.applyPersistedTheme()
+    }
+
     notifyFocusChange(focused: true)
 
     NotificationCenter.default.addObserver(
@@ -125,6 +130,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     decreaseItem.keyEquivalentModifierMask = [.command]
     let resetItem = viewMenu.addItem(withTitle: "Reset Font Size", action: #selector(handleResetFontSize), keyEquivalent: "0")
     resetItem.keyEquivalentModifierMask = [.command]
+    viewMenu.addItem(.separator())
+    let themeItem = viewMenu.addItem(withTitle: "Theme…", action: #selector(handleThemePicker), keyEquivalent: "k")
+    themeItem.keyEquivalentModifierMask = [.command]
     viewItem.submenu = viewMenu
     mainMenu.addItem(viewItem)
 
@@ -233,6 +241,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   @objc private func handleReopenClosedSession(_ sender: Any?) {
     activeMainWindowController?.reopenClosedSession()
+  }
+
+  @objc private func handleThemePicker(_ sender: Any?) {
+    activeMainWindowController?.toggleThemePicker()
   }
 
   // MARK: - Helpers
