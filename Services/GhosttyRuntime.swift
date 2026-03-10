@@ -8,6 +8,8 @@ extension Notification.Name {
   static let ghosttyCloseSurface = Notification.Name("GhosttyCloseSurface")
   static let ghosttySearchTotal = Notification.Name("GhosttySearchTotal")
   static let ghosttySearchSelected = Notification.Name("GhosttySearchSelected")
+  static let ghosttyMouseOverLink = Notification.Name("GhosttyMouseOverLink")
+  static let ghosttyCommandFinished = Notification.Name("GhosttyCommandFinished")
 }
 
 // MARK: - Runtime
@@ -163,6 +165,37 @@ private func onAction(
         url = URL(fileURLWithPath: urlString)
       }
       if let url { NSWorkspace.shared.open(url) }
+    }
+    return true
+
+  case GHOSTTY_ACTION_MOUSE_OVER_LINK:
+    let view = terminalViewFromTarget(target)
+    let urlString: String?
+    if let urlPtr = action.action.mouse_over_link.url, action.action.mouse_over_link.len > 0 {
+      urlString = String(cString: urlPtr)
+    } else {
+      urlString = nil
+    }
+    DispatchQueue.main.async {
+      NotificationCenter.default.post(
+        name: .ghosttyMouseOverLink,
+        object: view,
+        userInfo: urlString != nil ? ["url": urlString!] : nil
+      )
+    }
+    return true
+
+  case GHOSTTY_ACTION_COMMAND_FINISHED:
+    let exitCode = Int(action.action.command_finished.exit_code)
+    let durationNs = action.action.command_finished.duration
+    let durationSec = Double(durationNs) / 1_000_000_000
+    let view = terminalViewFromTarget(target)
+    DispatchQueue.main.async {
+      NotificationCenter.default.post(
+        name: .ghosttyCommandFinished,
+        object: view,
+        userInfo: ["exitCode": exitCode, "duration": durationSec]
+      )
     }
     return true
 

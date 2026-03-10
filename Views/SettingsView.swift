@@ -11,6 +11,8 @@ final class SettingsView: NSView {
   private let cursorSegment = NSSegmentedControl()
   private let cursorBlinkSwitch = NSSwitch()
   private let scrollbackPopup = NSPopUpButton()
+  private let opacitySlider = NSSlider()
+  private let opacityValueLabel = NSTextField()
 
   private let commonFonts = [
     "System Default",
@@ -103,6 +105,10 @@ final class SettingsView: NSView {
     } else {
       scrollbackPopup.selectItem(at: 2) // 10 MB default
     }
+
+    // Opacity
+    opacitySlider.doubleValue = mgr.backgroundOpacity * 100
+    opacityValueLabel.stringValue = "\(Int(mgr.backgroundOpacity * 100))%"
   }
 
   // MARK: - Setup
@@ -124,6 +130,7 @@ final class SettingsView: NSView {
     setupFontRow()
     setupCursorRow()
     setupScrollbackRow()
+    setupOpacityRow()
   }
 
   private func setupHeader() {
@@ -319,6 +326,60 @@ final class SettingsView: NSView {
     ])
   }
 
+  private func setupOpacityRow() {
+    let opacityLabel = makeLabel("Opacity")
+    opacityLabel.toolTip = "Requires restart to take effect"
+    addSubview(opacityLabel)
+
+    opacitySlider.translatesAutoresizingMaskIntoConstraints = false
+    opacitySlider.minValue = 20
+    opacitySlider.maxValue = 100
+    opacitySlider.doubleValue = 100
+    opacitySlider.target = self
+    opacitySlider.action = #selector(opacityChanged)
+    opacitySlider.controlSize = .small
+    addSubview(opacitySlider)
+
+    opacityValueLabel.translatesAutoresizingMaskIntoConstraints = false
+    opacityValueLabel.stringValue = "100%"
+    opacityValueLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+    opacityValueLabel.textColor = NSColor(white: 0.7, alpha: 1)
+    opacityValueLabel.backgroundColor = .clear
+    opacityValueLabel.isBordered = false
+    opacityValueLabel.isEditable = false
+    opacityValueLabel.isSelectable = false
+    opacityValueLabel.alignment = .right
+    addSubview(opacityValueLabel)
+
+    let restartHint = NSTextField()
+    restartHint.translatesAutoresizingMaskIntoConstraints = false
+    restartHint.stringValue = "Requires restart"
+    restartHint.font = NSFont.systemFont(ofSize: 10, weight: .regular)
+    restartHint.textColor = NSColor(white: 0.45, alpha: 1)
+    restartHint.backgroundColor = .clear
+    restartHint.isBordered = false
+    restartHint.isEditable = false
+    restartHint.isSelectable = false
+    addSubview(restartHint)
+
+    NSLayoutConstraint.activate([
+      opacityLabel.topAnchor.constraint(equalTo: scrollbackPopup.bottomAnchor, constant: 28),
+      opacityLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+      opacityLabel.widthAnchor.constraint(equalToConstant: 70),
+
+      opacitySlider.centerYAnchor.constraint(equalTo: opacityLabel.centerYAnchor),
+      opacitySlider.leadingAnchor.constraint(equalTo: opacityLabel.trailingAnchor, constant: 4),
+      opacitySlider.trailingAnchor.constraint(equalTo: opacityValueLabel.leadingAnchor, constant: -6),
+
+      opacityValueLabel.centerYAnchor.constraint(equalTo: opacityLabel.centerYAnchor),
+      opacityValueLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+      opacityValueLabel.widthAnchor.constraint(equalToConstant: 40),
+
+      restartHint.topAnchor.constraint(equalTo: opacityLabel.bottomAnchor, constant: 4),
+      restartHint.leadingAnchor.constraint(equalTo: opacityLabel.leadingAnchor),
+    ])
+  }
+
   // MARK: - Helpers
 
   private func makeLabel(_ text: String) -> NSTextField {
@@ -354,6 +415,12 @@ final class SettingsView: NSView {
     applyCurrentSettings()
   }
 
+  @objc private func opacityChanged() {
+    let pct = Int(opacitySlider.doubleValue)
+    opacityValueLabel.stringValue = "\(pct)%"
+    applyCurrentSettings()
+  }
+
   private func applyCurrentSettings() {
     guard !isRefreshing else { return }
     let selectedFont = fontFamilyPopup.titleOfSelectedItem ?? "System Default"
@@ -378,7 +445,8 @@ final class SettingsView: NSView {
       fontSize: size,
       cursorStyle: style,
       cursorBlink: blink,
-      scrollbackLines: scrollback
+      scrollbackLines: scrollback,
+      backgroundOpacity: opacitySlider.doubleValue / 100.0
     )
   }
 }

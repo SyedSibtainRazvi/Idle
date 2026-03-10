@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 
 final class PointerButton: NSButton {
   override func resetCursorRects() {
@@ -72,6 +73,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
   private let shellNames: Set<String> = ["zsh", "bash", "fish", "sh", "dash", "csh", "tcsh", "ksh"]
 
   private var themeObserver: NSObjectProtocol?
+  private var commandFinishedObserver: NSObjectProtocol?
+  private var linkHoverObserver: NSObjectProtocol?
+
+  // URL preview (floating label at bottom of terminal)
+  private let linkPreviewLabel = NSTextField()
 
   init() {
     let initialRect = NSRect(x: 0, y: 0, width: 900, height: 600)
@@ -189,6 +195,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     settingsPanel.isHidden = true
     terminalContainer.addSubview(settingsPanel)
 
+    // URL preview label — floating at bottom of terminal container
+    linkPreviewLabel.translatesAutoresizingMaskIntoConstraints = false
+    linkPreviewLabel.wantsLayer = true
+    linkPreviewLabel.layer?.cornerRadius = 4
+    linkPreviewLabel.layer?.backgroundColor = NSColor(white: 0.1, alpha: 0.9).cgColor
+    linkPreviewLabel.font = NSFont.systemFont(ofSize: 11, weight: .regular)
+    linkPreviewLabel.textColor = NSColor(white: 0.75, alpha: 1)
+    linkPreviewLabel.backgroundColor = .clear
+    linkPreviewLabel.isBordered = false
+    linkPreviewLabel.isEditable = false
+    linkPreviewLabel.isSelectable = false
+    linkPreviewLabel.lineBreakMode = .byTruncatingMiddle
+    linkPreviewLabel.isHidden = true
+    terminalContainer.addSubview(linkPreviewLabel)
+
     // ── Learning panel (right side) ──
 
     // Learning panel divider
@@ -253,7 +274,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       settingsPanel.centerXAnchor.constraint(equalTo: terminalContainer.centerXAnchor),
       settingsPanel.topAnchor.constraint(equalTo: terminalContainer.topAnchor, constant: 20),
       settingsPanel.widthAnchor.constraint(equalToConstant: 340),
-      settingsPanel.heightAnchor.constraint(equalToConstant: 320),
+      settingsPanel.heightAnchor.constraint(equalToConstant: 390),
+
+      // URL preview label — bottom-left of terminal container
+      linkPreviewLabel.leadingAnchor.constraint(equalTo: terminalContainer.leadingAnchor, constant: 6),
+      linkPreviewLabel.bottomAnchor.constraint(equalTo: terminalContainer.bottomAnchor, constant: -4),
+      linkPreviewLabel.trailingAnchor.constraint(lessThanOrEqualTo: terminalContainer.trailingAnchor, constant: -6),
 
       // Sidebar wrapper — below header
       sidebarWrapper.topAnchor.constraint(equalTo: headerDivider.bottomAnchor),
@@ -396,6 +422,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       NotificationCenter.default.removeObserver(themeObserver)
       self.themeObserver = nil
     }
+    if let commandFinishedObserver {
+      NotificationCenter.default.removeObserver(commandFinishedObserver)
+      self.commandFinishedObserver = nil
+    }
+    if let linkHoverObserver {
+      NotificationCenter.default.removeObserver(linkHoverObserver)
+      self.linkHoverObserver = nil
+    }
   }
 
   override func showWindow(_ sender: Any?) {
@@ -403,6 +437,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     if let view = sessions[safe: activeSessionIndex]?.terminalView {
       window?.makeFirstResponder(view)
     }
+    // Request notification permission for command-finished alerts
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
   }
 
   // MARK: - Header actions
@@ -1106,6 +1142,52 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
       guard let selected = notification.userInfo?["selected"] as? Int else { return }
       self.searchBar.updateMatchCount(total: self.searchBar.totalMatches, selected: selected)
     }
+
+    linkHoverObserver = NotificationCenter.default.addObserver(
+      forName: .ghosttyMouseOverLink,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard let self else { return }
+      guard let view = notification.object as? GhosttyTerminalView,
+            view === self.sessions[safe: self.activeSessionIndex]?.terminalView else { return }
+      if let url = notification.userInfo?["url"] as? String {
+        self.linkPreviewLabel.stringValue = "  \(url)  "
+        self.linkPreviewLabel.isHidden = false
+      } else {
+        self.linkPreviewLabel.isHidden = true
+      }
+    }
+
+    commandFinishedObserver = NotificationCenter.default.addObserver(
+      forName: .ghosttyCommandFinished,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard let self else { return }
+      guard let view = notification.object as? GhosttyTerminalView,
+            let exitCode = notification.userInfo?["exitCode"] as? Int,
+            let duration = notification.userInfo?["duration"] as? Double else { return }
+      guard let index = self.sessions.firstIndex(where: { $0.terminalView === view }) else { return }
+
+      self.sessions[index].isRunning = false
+      self.sidebar.updateSession(at: index, with: self.sessions[index])
+
+      // Only notify if app is not focused and command ran for > 5 seconds
+      guard !NSApp.isActive, duration > 5.0 else { return }
+      let content = UNMutableNotificationContent()
+      content.title = self.sessions[index].label
+      content.body = exitCode == 0
+        ? "Command finished successfully (\(Self.formatDuration(duration)))"
+        : "Command failed with exit code \(exitCode) (\(Self.formatDuration(duration)))"
+      content.sound = .default
+      let request = UNNotificationRequest(
+        identifier: UUID().uuidString,
+        content: content,
+        trigger: nil
+      )
+      UNUserNotificationCenter.current().add(request)
+    }
   }
 
   // MARK: - Full screen
@@ -1152,6 +1234,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     terminalContainer.layer?.backgroundColor = IdleTheme.bgColor.cgColor
     sidebar.refreshColors()
     learningPanel.refreshColors()
+  }
+
+  // MARK: - Helpers
+
+  private static func formatDuration(_ seconds: Double) -> String {
+    if seconds < 60 {
+      return "\(Int(seconds))s"
+    } else if seconds < 3600 {
+      let m = Int(seconds) / 60
+      let s = Int(seconds) % 60
+      return "\(m)m \(s)s"
+    } else {
+      let h = Int(seconds) / 3600
+      let m = (Int(seconds) % 3600) / 60
+      return "\(h)h \(m)m"
+    }
   }
 
   // MARK: - NSWindowDelegate

@@ -58,12 +58,14 @@ final class SettingsManager {
   private static let cursorStyleKey = "IdleCursorStyle"
   private static let cursorBlinkKey = "IdleCursorBlink"
   private static let scrollbackLinesKey = "IdleScrollbackLines"
+  private static let backgroundOpacityKey = "IdleBackgroundOpacity"
 
   private(set) var fontFamily: String
   private(set) var fontSize: Double
   private(set) var cursorStyle: CursorStyle
   private(set) var cursorBlink: Bool
   private(set) var scrollbackLines: Int
+  private(set) var backgroundOpacity: Double
 
   private init() {
     fontFamily = UserDefaults.standard.string(forKey: Self.fontFamilyKey) ?? ""
@@ -71,6 +73,7 @@ final class SettingsManager {
     cursorStyle = CursorStyle(rawValue: UserDefaults.standard.string(forKey: Self.cursorStyleKey) ?? "block") ?? .block
     cursorBlink = UserDefaults.standard.object(forKey: Self.cursorBlinkKey) as? Bool ?? true
     scrollbackLines = UserDefaults.standard.object(forKey: Self.scrollbackLinesKey) as? Int ?? 10_000_000
+    backgroundOpacity = UserDefaults.standard.object(forKey: Self.backgroundOpacityKey) as? Double ?? 1.0
   }
 
   /// Returns the settings portion of the Ghostty config (no theme keys).
@@ -83,6 +86,9 @@ final class SettingsManager {
     lines.append("cursor-style = \(cursorStyle.rawValue)")
     lines.append("cursor-style-blink = \(cursorBlink)")
     lines.append("scrollback-limit = \(scrollbackLines)")
+    if backgroundOpacity < 1.0 {
+      lines.append("background-opacity = \(String(format: "%.2f", backgroundOpacity))")
+    }
     return lines.joined(separator: "\n") + "\n"
   }
 
@@ -91,13 +97,15 @@ final class SettingsManager {
     fontSize: Double,
     cursorStyle: CursorStyle,
     cursorBlink: Bool,
-    scrollbackLines: Int
+    scrollbackLines: Int,
+    backgroundOpacity: Double = 1.0
   ) {
     self.fontFamily = fontFamily
     self.fontSize = fontSize
     self.cursorStyle = cursorStyle
     self.cursorBlink = cursorBlink
     self.scrollbackLines = scrollbackLines
+    self.backgroundOpacity = backgroundOpacity
     persistAll()
     IdleConfigComposer.applyAll()
     NotificationCenter.default.post(name: .idleSettingsDidChange, object: nil)
@@ -125,6 +133,7 @@ final class SettingsManager {
       && cursorStyle == .block
       && cursorBlink == true
       && scrollbackLines == 10_000_000
+      && backgroundOpacity == 1.0
     guard !isDefault else { return }
     IdleConfigComposer.applyAll()
   }
@@ -135,5 +144,6 @@ final class SettingsManager {
     UserDefaults.standard.set(cursorStyle.rawValue, forKey: Self.cursorStyleKey)
     UserDefaults.standard.set(cursorBlink, forKey: Self.cursorBlinkKey)
     UserDefaults.standard.set(scrollbackLines, forKey: Self.scrollbackLinesKey)
+    UserDefaults.standard.set(backgroundOpacity, forKey: Self.backgroundOpacityKey)
   }
 }
