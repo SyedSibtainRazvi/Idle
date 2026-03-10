@@ -199,9 +199,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     linkPreviewLabel.translatesAutoresizingMaskIntoConstraints = false
     linkPreviewLabel.wantsLayer = true
     linkPreviewLabel.layer?.cornerRadius = 4
-    linkPreviewLabel.layer?.backgroundColor = NSColor(white: 0.1, alpha: 0.9).cgColor
+    linkPreviewLabel.layer?.backgroundColor = IdleTheme.bgColor.blending(fraction: 0.1, of: .white).withAlphaComponent(0.9).cgColor
     linkPreviewLabel.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-    linkPreviewLabel.textColor = NSColor(white: 0.75, alpha: 1)
+    linkPreviewLabel.textColor = IdleTheme.secondaryText
     linkPreviewLabel.backgroundColor = .clear
     linkPreviewLabel.isBordered = false
     linkPreviewLabel.isEditable = false
@@ -437,8 +437,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     if let view = sessions[safe: activeSessionIndex]?.terminalView {
       window?.makeFirstResponder(view)
     }
-    // Request notification permission for command-finished alerts
-    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
   }
 
   // MARK: - Header actions
@@ -738,6 +736,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     if !learningPanel.isLearningEnabled {
       learningPanel.setStatus(text: "Learning is off.", isActive: false)
     }
+
+    // Clear stale link preview from previous session
+    linkPreviewLabel.isHidden = true
 
     // Rebind detector immediately so learning picks up if Claude is already running
     rebindDetectorForActiveSession()
@@ -1175,18 +1176,28 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
 
       // Only notify if app is not focused and command ran for > 5 seconds
       guard !NSApp.isActive, duration > 5.0 else { return }
-      let content = UNMutableNotificationContent()
-      content.title = self.sessions[index].label
-      content.body = exitCode == 0
-        ? "Command finished successfully (\(Self.formatDuration(duration)))"
-        : "Command failed with exit code \(exitCode) (\(Self.formatDuration(duration)))"
-      content.sound = .default
-      let request = UNNotificationRequest(
-        identifier: UUID().uuidString,
-        content: content,
-        trigger: nil
-      )
-      UNUserNotificationCenter.current().add(request)
+      let sessionLabel = self.sessions[index].label
+      let center = UNUserNotificationCenter.current()
+      center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+        guard granted else { return }
+        let content = UNMutableNotificationContent()
+        content.title = sessionLabel
+        let durationStr = Self.formatDuration(duration)
+        if exitCode < 0 {
+          content.body = "Command finished (\(durationStr))"
+        } else if exitCode == 0 {
+          content.body = "Command finished successfully (\(durationStr))"
+        } else {
+          content.body = "Command failed with exit code \(exitCode) (\(durationStr))"
+        }
+        content.sound = .default
+        let request = UNNotificationRequest(
+          identifier: UUID().uuidString,
+          content: content,
+          trigger: nil
+        )
+        center.add(request)
+      }
     }
   }
 
@@ -1232,6 +1243,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     titleLabel.textColor = IdleTheme.headerText
     window?.backgroundColor = IdleTheme.bgColor
     terminalContainer.layer?.backgroundColor = IdleTheme.bgColor.cgColor
+    linkPreviewLabel.layer?.backgroundColor = IdleTheme.bgColor.blending(fraction: 0.1, of: .white).withAlphaComponent(0.9).cgColor
+    linkPreviewLabel.textColor = IdleTheme.secondaryText
     sidebar.refreshColors()
     learningPanel.refreshColors()
   }

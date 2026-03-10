@@ -155,9 +155,10 @@ private func onAction(
 
   case GHOSTTY_ACTION_OPEN_URL:
     guard let urlPtr = action.action.open_url.url else { return false }
-    let urlString = String(cString: urlPtr)
+    let len = Int(action.action.open_url.len)
+    let buf = UnsafeRawBufferPointer(start: urlPtr, count: len)
+    let urlString = String(decoding: buf, as: UTF8.self)
     DispatchQueue.main.async {
-      // If it looks like a file path, convert to file URL
       let url: URL?
       if let candidate = URL(string: urlString), candidate.scheme != nil {
         url = candidate
@@ -172,7 +173,9 @@ private func onAction(
     let view = terminalViewFromTarget(target)
     let urlString: String?
     if let urlPtr = action.action.mouse_over_link.url, action.action.mouse_over_link.len > 0 {
-      urlString = String(cString: urlPtr)
+      let len = Int(action.action.mouse_over_link.len)
+      let buf = UnsafeRawBufferPointer(start: urlPtr, count: len)
+      urlString = String(decoding: buf, as: UTF8.self)
     } else {
       urlString = nil
     }
