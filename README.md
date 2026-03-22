@@ -1,6 +1,7 @@
 # Idle
 
 A macOS terminal built on [Ghostty](https://ghostty.org) with an AI learning panel that generates quiz questions from your Claude Code sessions.
+<img width="1305" height="842" alt="idle" src="https://github.com/user-attachments/assets/c177e7a4-9c0d-436c-bf94-33fe99e51bb6" />
 
 ## Requirements
 
