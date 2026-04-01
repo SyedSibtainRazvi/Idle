@@ -11,3 +11,6 @@ DerivedData/
 
 # Build
 build/
+
+# Claude Code
+.claude/

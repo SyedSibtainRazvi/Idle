@@ -1,94 +1,38 @@
-# Idle
+# Idle (Beta)
 
 A macOS terminal built on [Ghostty](https://ghostty.org) with an AI learning panel that generates quiz questions from your Claude Code sessions.
+
 <img width="1305" height="842" alt="idle" src="https://github.com/user-attachments/assets/c177e7a4-9c0d-436c-bf94-33fe99e51bb6" />
 
 ## Download
 
-Grab the latest DMG from [**GitHub Releases**](https://github.com/SyedSibtainRazvi/Idle/releases/latest).
+Grab the latest DMG from [**GitHub Releases**](https://github.com/SyedSibtainRazvi/Idle/releases/latest). Requires **macOS 14.0+**.
 
-1. Open **Idle-x.x.x-macOS.dmg** and drag **Idle.app** to `/Applications`.
-2. On first launch, macOS will warn that the app is not notarized. Click **Cancel**.
-3. Go to **System Settings > Privacy & Security**, scroll down, and click **Open Anyway** next to the Idle warning.
-4. Idle will launch normally from now on.
+1. Open the DMG and drag **Idle.app** to `/Applications`.
+2. First launch: macOS will warn about notarization — go to **System Settings > Privacy & Security** and click **Open Anyway**.
 
-Requires **macOS 14.0+**.
+## Features
+
+- GPU-rendered terminal powered by Ghostty
+- Tabbed sessions with split-view layout
+- Theming, configurable fonts, opacity, and scrollback
+- URL hover previews and click-to-open
+- Background command-finished notifications
+- **Idle Learning** — AI-powered quiz panel that generates questions while Claude Code works in your terminal. Uses your local `claude` CLI. Off by default.
 
 ## Building from Source
-
-Requires Xcode 15+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.44.1+, and GhosttyKit (see below).
-
-## Building from Source
-
-1. **Build GhosttyKit** — follow the instructions in `third_party/ghostty/` to produce the xcframework and resources:
-
-   ```
-   third_party/ghostty/zig-out/share/ghostty/   # shaders, keybinds, etc.
-   third_party/ghostty/zig-out/share/terminfo/   # bundled terminfo
-   ```
-
-   Both directories are required. The build will fail if either is missing.
-
-2. **Symlink the framework** (already checked in):
-
-   ```
-   GhosttyKit.xcframework -> third_party/ghostty/macos/GhosttyKit.xcframework
-   ```
-
-3. **Generate the Xcode project and build**:
-
-   ```bash
-   xcodegen generate
-   open Idle.xcodeproj
-   # Build & Run (Cmd+R)
-   ```
-
-## Idle Learning
-
-The sidebar includes an AI-powered learning panel that generates interactive quiz questions from your Claude Code sessions.
-
-- **Off by default.** Idle Learning only activates when you explicitly toggle it on.
-- **Uses your local Claude CLI.** When enabled, Idle calls `claude --print` using your local Claude installation and account. No separate API key is needed.
-- **Sends recent terminal context.** The active session's recent terminal output is sent to Claude to generate relevant questions. Only the active session is read; other tabs are not accessed.
-- **Token usage is visible.** Estimated input/output token counts are shown in the panel footer so you can track usage.
-
-### How it works
-
-1. Toggle the **Idle Learning** switch in the sidebar. A consent dialog explains what data is sent.
-2. Idle detects Claude Code by monitoring the terminal process title for the word "claude". Detection is heuristic and title-based — see limitations below.
-3. When Claude is detected, the panel reads recent terminal output to classify the session phase (thinking vs. executing).
-4. During thinking phases, context is sent to Claude to generate MCQ quiz questions about the concepts being discussed.
-5. Questions appear one at a time with instant correct/wrong feedback and a running score.
-
-### Known limitations
-
-- **Title-based detection.** Claude Code is detected by checking if the terminal process title contains "claude". This is a heuristic — it won't detect Claude if the process title is customised or absent, and it may false-positive on other processes with "claude" in the title. A more robust approach would use direct process inspection, but title-based detection is simple and works for the common case.
-- **Token estimates.** Input/output token counts shown in the footer are approximations (character count / 4), not actual API usage.
-
-## Signing
-
-Both configs default to ad-hoc signing so anyone can build from source:
-
-- **Debug**: `CODE_SIGN_IDENTITY = "-"`
-- **Release**: `CODE_SIGN_IDENTITY = "-"`
-
-To produce a notarised release build, override the signing identity and team on your own machine (e.g. via an `xcconfig` overlay or Xcode build settings):
-
-```
-CODE_SIGN_IDENTITY = Developer ID Application
-DEVELOPMENT_TEAM = <your team ID>
-```
-
-## Tests
 
 ```bash
+# 1. Build GhosttyKit (requires Zig 0.15.2)
+cd third_party/ghostty
+zig build --prefix zig-out -Doptimize=ReleaseFast -Demit-xcframework -Demit-macos-app=false
+cd ../..
+
+# 2. Generate and build
 xcodegen generate
-xcodebuild -project Idle.xcodeproj -scheme IdleTests test
+open Idle.xcodeproj   # Build & Run (Cmd+R)
 ```
 
 ## License
 
-Idle is licensed under **AGPL-3.0-or-later**. See [LICENSE](LICENSE).
-
-Third-party licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
-Ghostty (libghostty) is MIT-licensed.
+[AGPL-3.0-or-later](LICENSE). Ghostty (libghostty) is MIT-licensed. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
