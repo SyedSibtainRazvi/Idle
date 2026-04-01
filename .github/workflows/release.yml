@@ -30,7 +30,7 @@ jobs:
       - name: Build GhosttyKit
         working-directory: third_party/ghostty
         run: |
-          zig build --prefix zig-out -Doptimize=ReleaseFast -Demit-xcframework
+          zig build --prefix zig-out -Doptimize=ReleaseFast -Demit-xcframework -Demit-macos-app=false
 
       - name: Extract version from tag
         id: version
