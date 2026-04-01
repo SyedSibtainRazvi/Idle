@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install xcodegen
+
+      - name: Install Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Fetch Zig dependencies
+        working-directory: third_party/ghostty
+        run: |
+          ZIG_GLOBAL_CACHE_DIR="$PWD/.zig-cache" ./nix/build-support/fetch-zig-cache.sh
+
+      - name: Build GhosttyKit
+        working-directory: third_party/ghostty
+        run: |
+          zig build --prefix zig-out -Doptimize=ReleaseFast -Demit-xcframework
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build app and create DMG
+        run: ./scripts/create-dmg.sh "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Idle v${{ steps.version.outputs.version }}
+          draft: true
+          generate_release_notes: true
+          files: build/Idle-${{ steps.version.outputs.version }}-macOS.dmg
