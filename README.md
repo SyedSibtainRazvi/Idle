@@ -3,20 +3,20 @@
 A macOS terminal built on [Ghostty](https://ghostty.org) with an AI learning panel that generates quiz questions from your Claude Code sessions.
 <img width="1305" height="842" alt="idle" src="https://github.com/user-attachments/assets/c177e7a4-9c0d-436c-bf94-33fe99e51bb6" />
 
-## Requirements
+## Download
 
-- macOS 14.0+
-- Xcode 15+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.44.1+
-- GhosttyKit (see below)
+Grab the latest DMG from [**GitHub Releases**](https://github.com/SyedSibtainRazvi/Idle/releases/latest).
 
-## Install
-
-If you're running a prebuilt release (`.zip` or `.dmg`):
-
-1. Drag **Idle.app** to `/Applications`.
+1. Open **Idle-x.x.x-macOS.dmg** and drag **Idle.app** to `/Applications`.
 2. On first launch, macOS will warn that the app is not notarized. Click **Cancel**.
 3. Go to **System Settings > Privacy & Security**, scroll down, and click **Open Anyway** next to the Idle warning.
 4. Idle will launch normally from now on.
+
+Requires **macOS 14.0+**.
+
+## Building from Source
+
+Requires Xcode 15+, [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.44.1+, and GhosttyKit (see below).
 
 ## Building from Source
 

@@ -227,11 +227,10 @@ final class LearningEngine {
   }
 
   private func buildPrompt(context: ClaudeCodeContext) -> String {
-    let recentOutput = String(context.recentOutput.prefix(2000))
+    let recentOutput = String(context.recentOutput.prefix(4000))
 
     return """
-    You are helping a developer learn while an AI coding assistant works on their code.
-    The AI assistant is currently thinking/planning in a terminal session.
+    You are a tutor helping a developer learn from an AI coding assistant working in their terminal.
 
     Working directory: \(context.workingDirectory)
 
@@ -240,39 +239,45 @@ final class LearningEngine {
     \(recentOutput)
     ```
 
-    Generate educational content about what the AI is doing. Provide:
-    1. 2-3 contextual insights — short explanations of what the AI is currently analyzing and why it matters
-    2. 5 multiple-choice quiz questions testing understanding of the concepts being applied
+    Based ONLY on what is happening in this terminal output, generate:
+    1. 2-3 insights — one-sentence explanations of what the AI is doing and why it matters.
+    2. 5 multiple-choice questions that test understanding of the specific concepts, tools, or patterns visible in this output. Do NOT generate generic CS trivia — every question must relate to something in the terminal output above.
 
-    Each quiz question must have exactly 4 options with one correct answer.
-    Shuffle the correct answer position across questions.
+    Mix difficulty: 2 easy (definition/recall), 2 medium (understanding/application), 1 hard (analysis/tradeoffs).
+    Each question must have exactly 4 options with one correct answer. Vary the correct answer position.
+    Keep explanations to 1-2 sentences max.
 
-    Respond ONLY with valid JSON in this exact format (no markdown, no backticks):
+    Respond ONLY with valid JSON (no markdown fences, no backticks, no commentary):
     {
       "insights": [
-        {
-          "category": "Architecture",
-          "title": "Analyzing Module Structure",
-          "explanation": "Claude is examining how the codebase splits responsibilities across files. This modular pattern makes each piece independently testable and reusable."
-        }
+        {"category": "Architecture", "title": "Short title", "explanation": "One sentence."}
       ],
       "questions": [
         {
-          "category": "Architecture",
-          "question": "Why is the code being split into separate modules?",
-          "options": ["To make the repo larger", "To separate concerns for testability and reuse", "To slow down compilation", "To confuse other developers"],
+          "category": "Debugging",
+          "question": "Why does Claude read the file before editing it?",
+          "options": ["To count lines", "To verify the edit target exists and get current content", "To check permissions", "To measure file size"],
           "correctAnswerIndex": 1,
-          "explanation": "Modular architecture separates concerns, making code easier to test, maintain, and reuse."
+          "explanation": "Reading first ensures the edit target string exists and avoids blind modifications."
         }
       ]
     }
 
-    Categories should be one of: Architecture, Git, Testing, Performance, Security, Patterns, Debugging, DevOps
+    Categories: Architecture, Git, Testing, Performance, Security, Patterns, Debugging, DevOps, Shell, Dependencies
     """
   }
 
   private func parseResponse(from output: String) -> (insights: [LearningInsight], questions: [LearningQuestion]) {
-    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+    var trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // Strip markdown code fences that Claude sometimes emits despite instructions
+    if let fenceStart = trimmed.range(of: "```json"),
+       let fenceEnd = trimmed.range(of: "```", range: fenceStart.upperBound..<trimmed.endIndex) {
+      trimmed = String(trimmed[fenceStart.upperBound..<fenceEnd.lowerBound])
+    } else if let fenceStart = trimmed.range(of: "```"),
+              let fenceEnd = trimmed.range(of: "```", range: fenceStart.upperBound..<trimmed.endIndex) {
+      trimmed = String(trimmed[fenceStart.upperBound..<fenceEnd.lowerBound])
+    }
 
     // Find JSON object boundaries
     guard let startIndex = trimmed.firstIndex(of: "{"),
@@ -313,6 +318,7 @@ final class LearningEngine {
         guard r.options.count == 4,
               r.correctAnswerIndex >= 0,
               r.correctAnswerIndex < 4 else {
+          NSLog("[LearningEngine] Dropped malformed question: %d options, index %d", r.options.count, r.correctAnswerIndex)
           return nil
         }
         return LearningQuestion(

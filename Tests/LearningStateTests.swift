@@ -151,11 +151,11 @@ final class LearningStateTests: XCTestCase {
     XCTAssertEqual(detector.classifyPhase(recentText: text), .executing)
   }
 
-  func testClassifyPhaseDefaultsToExecuting() {
+  func testClassifyPhaseDefaultsToThinking() {
     let detector = ClaudeCodeDetector()
-    // No patterns matched at all
+    // No patterns matched — defaults to thinking so questions generate
     let text = "some random output"
-    XCTAssertEqual(detector.classifyPhase(recentText: text), .executing)
+    XCTAssertEqual(detector.classifyPhase(recentText: text), .thinking)
   }
 
   // MARK: - LearningQuestion validation

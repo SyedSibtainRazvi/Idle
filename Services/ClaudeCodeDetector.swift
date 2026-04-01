@@ -43,10 +43,20 @@ final class ClaudeCodeDetector {
     "I will ",
     "Let me ",
     "## Plan",
+    "# Plan",
     "Planning",
     "Analyzing",
     "considering",
     "approach",
+    "I need to",
+    "The issue",
+    "Looking at",
+    "strategy",
+    "investigate",
+    "understand",
+    "Step ",
+    "First,",
+    "Then,",
   ]
 
   private let executingPatterns: [String] = [
@@ -56,10 +66,19 @@ final class ClaudeCodeDetector {
     "Read(",
     "Grep(",
     "Glob(",
+    "Agent(",
+    "Skill(",
+    "TaskCreate(",
+    "TaskUpdate(",
+    "WebFetch(",
+    "WebSearch(",
+    "NotebookEdit(",
     "$ ",
     "running ",
     "Created ",
     "Updated ",
+    "Compiling",
+    "Building",
   ]
 
   deinit {
@@ -171,7 +190,7 @@ final class ClaudeCodeDetector {
     } else if thinkingScore > 0 {
       return .thinking
     }
-    return .executing // Default to executing when claude is running but phase is unclear
+    return .thinking // Default to thinking so questions generate in ambiguous cases
   }
 
   private func extractThinkingBlock(from text: String) -> String {
