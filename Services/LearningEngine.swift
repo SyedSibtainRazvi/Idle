@@ -294,12 +294,51 @@ final class LearningEngine {
       let explanation: String
     }
 
+    struct FlexibleIndex: Decodable {
+      let value: Int
+      init(value: Int) { self.value = value }
+      init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let intVal = try? container.decode(Int.self) {
+          value = intVal
+        } else if let strVal = try? container.decode(String.self), let parsed = Int(strVal) {
+          value = parsed
+        } else {
+          value = -1
+        }
+      }
+    }
+
     struct RawQuestion: Decodable {
-      let category: String
+      let category: String?
       let question: String
-      let explanation: String
+      let explanation: String?
       let options: [String]
-      let correctAnswerIndex: Int
+      let correctAnswerIndex: FlexibleIndex
+
+      let correctAnswer: String?
+
+      enum CodingKeys: String, CodingKey {
+        case category, question, explanation, options
+        case correctAnswerIndex = "correctAnswerIndex"
+        case correctAnswer = "correct_answer"
+      }
+
+      init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        category = try container.decodeIfPresent(String.self, forKey: .category)
+        question = try container.decode(String.self, forKey: .question)
+        explanation = try container.decodeIfPresent(String.self, forKey: .explanation)
+        options = try container.decode([String].self, forKey: .options)
+        correctAnswer = try container.decodeIfPresent(String.self, forKey: .correctAnswer)
+
+        // Try correctAnswerIndex, fall back to correct_answer_index (snake_case)
+        if let idx = try? container.decode(FlexibleIndex.self, forKey: .correctAnswerIndex) {
+          correctAnswerIndex = idx
+        } else {
+          correctAnswerIndex = FlexibleIndex(value: -1)
+        }
+      }
     }
 
     struct RawResponse: Decodable {
@@ -315,22 +354,32 @@ final class LearningEngine {
       }
 
       let questions = (raw.questions ?? []).compactMap { r -> LearningQuestion? in
-        guard r.options.count == 4,
-              r.correctAnswerIndex >= 0,
-              r.correctAnswerIndex < 4 else {
-          NSLog("[LearningEngine] Dropped malformed question: %d options, index %d", r.options.count, r.correctAnswerIndex)
+        var idx = r.correctAnswerIndex.value
+        // Fall back to matching correct_answer text against options
+        if idx < 0, let answer = r.correctAnswer {
+          idx = r.options.firstIndex(of: answer) ?? -1
+        }
+        guard r.options.count >= 2,
+              idx >= 0,
+              idx < r.options.count else {
+          NSLog("[LearningEngine] Dropped malformed question: %d options, index %d", r.options.count, idx)
           return nil
         }
+        // Pad to 4 options if fewer, trim if more
+        var opts = Array(r.options.prefix(4))
+        let adjustedIdx = min(idx, opts.count - 1)
+        while opts.count < 4 { opts.append("None of the above") }
         return LearningQuestion(
           id: UUID(),
           question: r.question,
-          explanation: r.explanation,
-          category: r.category,
-          options: r.options,
-          correctAnswerIndex: r.correctAnswerIndex
+          explanation: r.explanation ?? "",
+          category: r.category ?? "General",
+          options: opts,
+          correctAnswerIndex: adjustedIdx
         )
       }
 
+      NSLog("[LearningEngine] Parsed %d insights, %d questions (from %d raw)", insights.count, questions.count, raw.questions?.count ?? 0)
       return (insights, questions)
     } catch {
       NSLog("[LearningEngine] JSON parse error: %@", error.localizedDescription)
