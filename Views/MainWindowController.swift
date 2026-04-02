@@ -554,9 +554,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     let processTitle = session.processTitle
     let workingDir = session.workingDirectory
     let view = session.terminalView
-    claudeDetector.titleDidChange(processTitle, workingDirectory: workingDir) { [weak view] in
-      return view?.readViewportText()
-    }
+    let reader: () -> String? = { [weak view] in view?.readViewportText() }
+    claudeDetector.titleDidChange(processTitle, workingDirectory: workingDir, viewportReader: reader)
+    // Also start content-based detection so Claude Code is detected from
+    // viewport markers (⏺ prompt) even when the title doesn't contain "claude"
+    claudeDetector.startContentDetection(workingDirectory: workingDir, viewportReader: reader)
   }
 
   // MARK: - ClaudeCodeDetectorDelegate

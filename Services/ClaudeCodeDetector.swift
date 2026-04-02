@@ -108,6 +108,17 @@ final class ClaudeCodeDetector {
     }
   }
 
+  /// Start content-based detection when learning is enabled.
+  /// Polls viewport text for Claude Code markers (e.g. the ⏺ prompt) even
+  /// when the terminal title doesn't contain "claude".
+  func startContentDetection(workingDirectory: String, viewportReader: @escaping () -> String?) {
+    dispatchPrecondition(condition: .onQueue(.main))
+    readViewportText = viewportReader
+    currentWorkingDirectory = workingDirectory
+    guard pollingTimer == nil else { return }
+    startPolling()
+  }
+
   /// Update the working directory without restarting monitoring.
   /// Call when the user `cd`s inside an active Claude session.
   func updateWorkingDirectory(_ directory: String) {
@@ -147,12 +158,27 @@ final class ClaudeCodeDetector {
     pollingTimer = nil
   }
 
+  /// Markers that indicate Claude Code is running, checked in viewport text
+  /// when title-based detection hasn't triggered.
+  private static let contentMarkers: [String] = [
+    "\u{2B58}",  // ⏺ — Claude Code's prompt symbol
+    "\u{25CF}",  // ● — alternate bullet
+    "Claude Code",
+  ]
+
   private func pollTerminal(epoch: UInt64) {
     // Dispatch all work to main thread to avoid deadlock.
     // Classification is fast (string matching), so main thread is fine.
     DispatchQueue.main.async { [weak self] in
-      guard let self, self.isClaudeRunning, epoch == self.epoch else { return }
+      guard let self, epoch == self.epoch else { return }
       guard let text = self.readViewportText?(), !text.isEmpty else { return }
+
+      // If title-based detection didn't fire, check viewport for Claude Code markers
+      if !self.isClaudeRunning {
+        let hasMarker = Self.contentMarkers.contains { text.contains($0) }
+        guard hasMarker else { return }
+        self.isClaudeRunning = true
+      }
 
       let lines = text.components(separatedBy: .newlines)
       let recentLines = lines.suffix(30)
