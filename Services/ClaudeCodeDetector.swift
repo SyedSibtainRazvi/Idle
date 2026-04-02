@@ -100,11 +100,13 @@ final class ClaudeCodeDetector {
       startPolling()
     } else if !isClaudeInTitle && isClaudeRunning {
       stopMonitoring()
-      setPhase(.inactive, context: ClaudeCodeContext(
+      let context = ClaudeCodeContext(
         workingDirectory: workingDirectory,
         recentOutput: "",
         planningText: ""
-      ))
+      )
+      currentPhase = .inactive
+      delegate?.claudeCodePhaseDidChange(.inactive, context: context)
     }
   }
 
