@@ -196,27 +196,22 @@ final class ClaudeCodeDetector {
   }
 
   func classifyPhase(recentText: String) -> ClaudeCodePhase {
-    var thinkingScore = 0
-    var executingScore = 0
+    // Scan from bottom up — the most recent lines determine the current phase.
+    // Old thinking + executing content coexists in the viewport; only the tail matters.
+    let lines = recentText.components(separatedBy: .newlines)
 
-    for pattern in thinkingPatterns {
-      if recentText.contains(pattern) {
-        thinkingScore += 1
+    for line in lines.reversed() {
+      let isThinking = thinkingPatterns.contains { line.contains($0) }
+      let isExecuting = executingPatterns.contains { line.contains($0) }
+
+      if isExecuting && !isThinking {
+        return .executing
+      }
+      if isThinking && !isExecuting {
+        return .thinking
       }
     }
-
-    for pattern in executingPatterns {
-      if recentText.contains(pattern) {
-        executingScore += 1
-      }
-    }
-
-    if executingScore > thinkingScore {
-      return .executing
-    } else if thinkingScore > 0 {
-      return .thinking
-    }
-    return .thinking // Default to thinking so questions generate in ambiguous cases
+    return .executing
   }
 
   private func extractThinkingBlock(from text: String) -> String {

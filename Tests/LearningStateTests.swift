@@ -144,18 +144,25 @@ final class LearningStateTests: XCTestCase {
     XCTAssertEqual(detector.classifyPhase(recentText: text), .executing)
   }
 
-  func testClassifyPhaseMixedFavorsExecuting() {
+  func testClassifyPhaseBottomUpLastLineWins() {
     let detector = ClaudeCodeDetector()
-    // When executing signals outweigh thinking signals, should be executing
-    let text = "Let me plan\nEdit(foo.swift)\nBash(ls)\nCreated bar.ts"
+    // Old executing lines at top, thinking at bottom — bottom wins
+    let text = "Edit(foo.swift)\nBash(ls)\nCreated bar.ts\nLet me analyze the issue"
+    XCTAssertEqual(detector.classifyPhase(recentText: text), .thinking)
+  }
+
+  func testClassifyPhaseMixedExecutingLast() {
+    let detector = ClaudeCodeDetector()
+    // Thinking at top, executing at bottom — bottom wins
+    let text = "Let me plan the approach\nI'll investigate\nEdit(foo.swift)\nCreated bar.ts"
     XCTAssertEqual(detector.classifyPhase(recentText: text), .executing)
   }
 
-  func testClassifyPhaseDefaultsToThinking() {
+  func testClassifyPhaseDefaultsToExecuting() {
     let detector = ClaudeCodeDetector()
-    // No patterns matched — defaults to thinking so questions generate
+    // No patterns matched — defaults to executing
     let text = "some random output"
-    XCTAssertEqual(detector.classifyPhase(recentText: text), .thinking)
+    XCTAssertEqual(detector.classifyPhase(recentText: text), .executing)
   }
 
   // MARK: - LearningQuestion validation

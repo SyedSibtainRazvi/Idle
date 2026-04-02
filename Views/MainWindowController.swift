@@ -602,18 +602,24 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
           requestID == learningSessionID,
           requestID == sessions[safe: activeSessionIndex]?.id else { return }
 
-    // Show insights if no quiz is active
+    // Show insights briefly, then start quiz automatically
     if !learningPanel.isQuizInProgress {
       learningPanel.showInsights(insights)
     }
 
-    // Queue questions for execution phase
     pendingQuestions = questions
 
-    // If already in execution phase and no quiz running, start immediately
-    if currentPhase == .executing && !learningPanel.isQuizInProgress && !questions.isEmpty {
-      learningPanel.startQuiz(questions)
-      pendingQuestions = []
+    if !learningPanel.isQuizInProgress && !questions.isEmpty {
+      // Start quiz after a short delay so user can read insights first
+      DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+        guard let self,
+              self.learningPanel.isLearningEnabled,
+              !self.learningPanel.isQuizInProgress,
+              !self.pendingQuestions.isEmpty else { return }
+        self.learningPanel.startQuiz(self.pendingQuestions)
+        self.pendingQuestions = []
+        self.saveCurrentLearningState()
+      }
     }
 
     saveCurrentLearningState()
