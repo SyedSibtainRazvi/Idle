@@ -10,6 +10,7 @@ Grab the latest DMG from [**GitHub Releases**](https://github.com/SyedSibtainRaz
 
 1. Open the DMG and drag **Idle.app** to `/Applications`.
 2. First launch: macOS will warn about notarization — go to **System Settings > Privacy & Security** and click **Open Anyway**.
+3. Grant Full Disk Access: **System Settings > Privacy & Security > Full Disk Access** and add Idle. This lets the terminal access project files without repeated permission prompts.
 
 ## Features
 
