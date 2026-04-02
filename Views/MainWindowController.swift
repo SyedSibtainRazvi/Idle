@@ -338,6 +338,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     claudeDetector.delegate = self
     learningEngine.delegate = self
     learningPanel.onClose = { [weak self] in self?.toggleLearningPanel() }
+    learningPanel.onStartQuiz = { [weak self] in self?.startQuizIfReady() }
     themePicker.onClose = { [weak self] in self?.hideThemePicker() }
     settingsPanel.onClose = { [weak self] in self?.hideSettingsPanel() }
     learningPanel.shouldToggleLearning = { [weak self] enabled in
@@ -607,6 +608,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
 
   private func startQuizIfReady() {
     guard !pendingQuestions.isEmpty && !learningPanel.isQuizInProgress else { return }
+    learningPanel.setHasPendingQuiz(false)
     learningPanel.startQuiz(pendingQuestions)
     pendingQuestions = []
     saveCurrentLearningState()
@@ -619,19 +621,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
           requestID == learningSessionID,
           requestID == sessions[safe: activeSessionIndex]?.id else { return }
 
-    // Show insights, queue questions
+    // Show insights, queue questions, show Start Quiz button
     if !learningPanel.isQuizInProgress {
       learningPanel.showInsights(insights)
     }
     pendingQuestions = questions
+    learningPanel.setHasPendingQuiz(!questions.isEmpty)
     saveCurrentLearningState()
-
-    // Auto-start quiz after delay so user can read insights
-    if !questions.isEmpty {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-        self?.startQuizIfReady()
-      }
-    }
   }
 
   func learningEngineDidEncounterError(_ error: String, requestID: UUID) {

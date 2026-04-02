@@ -393,6 +393,7 @@ final class LearningPanelView: NSView {
   private let quizCard = QuizCardView()
   private let completionLabel = NSTextField()
   private let emptyLabel = NSTextField()
+  private let startQuizButton = PointerButton()
   private let tokenFooter = NSView()
   private let tokenFooterDivider = NSView()
   private let tokenFooterLabel = NSTextField()
@@ -411,6 +412,7 @@ final class LearningPanelView: NSView {
   var onClose: (() -> Void)?
   var shouldToggleLearning: ((Bool) -> Bool)?
   var onToggleLearning: ((Bool) -> Void)?
+  var onStartQuiz: (() -> Void)?
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -426,6 +428,15 @@ final class LearningPanelView: NSView {
 
   var isQuizInProgress: Bool {
     mode == .quiz
+  }
+
+  private(set) var hasPendingQuiz = false
+
+  func setHasPendingQuiz(_ pending: Bool) {
+    hasPendingQuiz = pending
+    if mode == .insights {
+      applyMode(.insights)
+    }
   }
 
   func showInsights(_ newInsights: [LearningInsight]) {
@@ -561,15 +572,33 @@ final class LearningPanelView: NSView {
       progressRow.isHidden = true
       completionLabel.isHidden = true
       emptyLabel.isHidden = true
+      startQuizButton.isHidden = !hasPendingQuiz
 
       scrollDocumentView.addSubview(insightsStack)
       insightsStack.translatesAutoresizingMaskIntoConstraints = false
-      NSLayoutConstraint.activate([
-        insightsStack.topAnchor.constraint(equalTo: scrollDocumentView.topAnchor, constant: 4),
-        insightsStack.leadingAnchor.constraint(equalTo: scrollDocumentView.leadingAnchor),
-        insightsStack.trailingAnchor.constraint(equalTo: scrollDocumentView.trailingAnchor),
-        insightsStack.bottomAnchor.constraint(equalTo: scrollDocumentView.bottomAnchor, constant: -4),
-      ])
+
+      if hasPendingQuiz {
+        scrollDocumentView.addSubview(startQuizButton)
+        startQuizButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+          insightsStack.topAnchor.constraint(equalTo: scrollDocumentView.topAnchor, constant: 4),
+          insightsStack.leadingAnchor.constraint(equalTo: scrollDocumentView.leadingAnchor),
+          insightsStack.trailingAnchor.constraint(equalTo: scrollDocumentView.trailingAnchor),
+
+          startQuizButton.topAnchor.constraint(equalTo: insightsStack.bottomAnchor, constant: 12),
+          startQuizButton.centerXAnchor.constraint(equalTo: scrollDocumentView.centerXAnchor),
+          startQuizButton.widthAnchor.constraint(equalToConstant: 200),
+          startQuizButton.heightAnchor.constraint(equalToConstant: 36),
+          startQuizButton.bottomAnchor.constraint(equalTo: scrollDocumentView.bottomAnchor, constant: -8),
+        ])
+      } else {
+        NSLayoutConstraint.activate([
+          insightsStack.topAnchor.constraint(equalTo: scrollDocumentView.topAnchor, constant: 4),
+          insightsStack.leadingAnchor.constraint(equalTo: scrollDocumentView.leadingAnchor),
+          insightsStack.trailingAnchor.constraint(equalTo: scrollDocumentView.trailingAnchor),
+          insightsStack.bottomAnchor.constraint(equalTo: scrollDocumentView.bottomAnchor, constant: -4),
+        ])
+      }
 
     case .quiz:
       contentScrollView.isHidden = false
@@ -634,6 +663,7 @@ final class LearningPanelView: NSView {
     setupDisclosureLabel()
     setupProgressRow()
     setupScrollView()
+    setupStartQuizButton()
     setupCompletionLabel()
     setupEmptyState()
     setupTokenFooter()
@@ -794,6 +824,25 @@ final class LearningPanelView: NSView {
     completionLabel.lineBreakMode = .byWordWrapping
     completionLabel.isHidden = true
     addSubview(completionLabel)
+  }
+
+  private func setupStartQuizButton() {
+    startQuizButton.translatesAutoresizingMaskIntoConstraints = false
+    startQuizButton.title = "Start Quiz"
+    startQuizButton.bezelStyle = .rounded
+    startQuizButton.isBordered = false
+    startQuizButton.wantsLayer = true
+    startQuizButton.layer?.backgroundColor = IdleTheme.accentColor.cgColor
+    startQuizButton.layer?.cornerRadius = 8
+    startQuizButton.contentTintColor = .white
+    startQuizButton.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+    startQuizButton.target = self
+    startQuizButton.action = #selector(startQuizTapped)
+    startQuizButton.isHidden = true
+  }
+
+  @objc private func startQuizTapped() {
+    onStartQuiz?()
   }
 
   private func setupEmptyState() {
