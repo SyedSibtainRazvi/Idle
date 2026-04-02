@@ -567,7 +567,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     guard learningPanel.isLearningEnabled else { return }
     currentPhase = phase
 
-    // Tag the generation with the current session so stale callbacks are discarded
     let sessionID = sessions[safe: activeSessionIndex]?.id
 
     switch phase {
@@ -581,12 +580,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
 
     case .executing:
       learningPanel.setStatus(text: "Test your knowledge!", isActive: false)
-      // Start quiz if we have pending questions and no quiz in progress
-      if !pendingQuestions.isEmpty && !learningPanel.isQuizInProgress {
-        learningPanel.startQuiz(pendingQuestions)
-        pendingQuestions = []
-        saveCurrentLearningState()
-      }
+      startQuizIfReady()
 
     case .inactive:
       learningPanel.dimPanel()
@@ -594,35 +588,50 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, SidebarD
     }
   }
 
+  func claudeCodeContextDidUpdate(_ phase: ClaudeCodePhase, context: ClaudeCodeContext) {
+    guard learningPanel.isLearningEnabled else { return }
+
+    // When content changes during thinking and no quiz is running, generate new questions
+    if phase == .thinking && !learningPanel.isQuizInProgress {
+      if let sessionID = sessions[safe: activeSessionIndex]?.id {
+        learningSessionID = sessionID
+        learningEngine.generate(context: context, requestID: sessionID)
+      }
+    }
+
+    // When content changes during executing and we have pending questions, start quiz
+    if phase == .executing {
+      startQuizIfReady()
+    }
+  }
+
+  private func startQuizIfReady() {
+    guard !pendingQuestions.isEmpty && !learningPanel.isQuizInProgress else { return }
+    learningPanel.startQuiz(pendingQuestions)
+    pendingQuestions = []
+    saveCurrentLearningState()
+  }
+
   // MARK: - LearningEngineDelegate
 
   func learningEngineDidGenerate(insights: [LearningInsight], questions: [LearningQuestion], requestID: UUID) {
-    // Discard results from a session that is no longer active or if learning was disabled
     guard learningPanel.isLearningEnabled,
           requestID == learningSessionID,
           requestID == sessions[safe: activeSessionIndex]?.id else { return }
 
-    // Show insights briefly, then start quiz automatically
+    // Show insights, queue questions
     if !learningPanel.isQuizInProgress {
       learningPanel.showInsights(insights)
     }
-
     pendingQuestions = questions
+    saveCurrentLearningState()
 
-    if !learningPanel.isQuizInProgress && !questions.isEmpty {
-      // Start quiz after a short delay so user can read insights first
+    // Auto-start quiz after delay so user can read insights
+    if !questions.isEmpty {
       DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-        guard let self,
-              self.learningPanel.isLearningEnabled,
-              !self.learningPanel.isQuizInProgress,
-              !self.pendingQuestions.isEmpty else { return }
-        self.learningPanel.startQuiz(self.pendingQuestions)
-        self.pendingQuestions = []
-        self.saveCurrentLearningState()
+        self?.startQuizIfReady()
       }
     }
-
-    saveCurrentLearningState()
   }
 
   func learningEngineDidEncounterError(_ error: String, requestID: UUID) {

@@ -16,6 +16,7 @@ struct ClaudeCodeContext {
 
 protocol ClaudeCodeDetectorDelegate: AnyObject {
   func claudeCodePhaseDidChange(_ phase: ClaudeCodePhase, context: ClaudeCodeContext)
+  func claudeCodeContextDidUpdate(_ phase: ClaudeCodePhase, context: ClaudeCodeContext)
 }
 
 // MARK: - Detector
@@ -27,8 +28,9 @@ final class ClaudeCodeDetector {
   private var pollingTimer: DispatchSourceTimer?
   private var isClaudeRunning = false
   private var readViewportText: (() -> String?)?
-  /// The current working directory, updated live when the user `cd`s.
   private var currentWorkingDirectory: String = ""
+  /// Hash of last viewport text to detect when content actually changes.
+  private var lastContentHash: Int = 0
   /// Monotonic counter incremented on every stopMonitoring(). Stale poll
   /// callbacks check this to avoid firing after the detector was rebound.
   private var epoch: UInt64 = 0
@@ -87,8 +89,6 @@ final class ClaudeCodeDetector {
 
   // MARK: - Public API
 
-  /// Call when the terminal title changes. Starts/stops monitoring based on whether "claude" is in the title.
-  /// Must be called on main thread.
   func titleDidChange(_ title: String, workingDirectory: String, viewportReader: @escaping () -> String?) {
     dispatchPrecondition(condition: .onQueue(.main))
     let isClaudeInTitle = title.lowercased().contains("claude")
@@ -108,9 +108,6 @@ final class ClaudeCodeDetector {
     }
   }
 
-  /// Start content-based detection when learning is enabled.
-  /// Polls viewport text for Claude Code markers (e.g. the ⏺ prompt) even
-  /// when the terminal title doesn't contain "claude".
   func startContentDetection(workingDirectory: String, viewportReader: @escaping () -> String?) {
     dispatchPrecondition(condition: .onQueue(.main))
     readViewportText = viewportReader
@@ -119,15 +116,11 @@ final class ClaudeCodeDetector {
     startPolling()
   }
 
-  /// Update the working directory without restarting monitoring.
-  /// Call when the user `cd`s inside an active Claude session.
   func updateWorkingDirectory(_ directory: String) {
     dispatchPrecondition(condition: .onQueue(.main))
     currentWorkingDirectory = directory
   }
 
-  /// Stop all monitoring and reset phase. Call on session close or tab switch.
-  /// Must be called on main thread.
   func stopMonitoring() {
     dispatchPrecondition(condition: .onQueue(.main))
     epoch += 1
@@ -136,6 +129,7 @@ final class ClaudeCodeDetector {
     isClaudeRunning = false
     readViewportText = nil
     currentPhase = .inactive
+    lastContentHash = 0
   }
 
   // MARK: - Polling
@@ -158,8 +152,6 @@ final class ClaudeCodeDetector {
     pollingTimer = nil
   }
 
-  /// Markers that indicate Claude Code is running, checked in viewport text
-  /// when title-based detection hasn't triggered.
   private static let contentMarkers: [String] = [
     "\u{2B58}",  // ⏺ — Claude Code's prompt symbol
     "\u{25CF}",  // ● — alternate bullet
@@ -167,13 +159,10 @@ final class ClaudeCodeDetector {
   ]
 
   private func pollTerminal(epoch: UInt64) {
-    // Dispatch all work to main thread to avoid deadlock.
-    // Classification is fast (string matching), so main thread is fine.
     DispatchQueue.main.async { [weak self] in
       guard let self, epoch == self.epoch else { return }
       guard let text = self.readViewportText?(), !text.isEmpty else { return }
 
-      // If title-based detection didn't fire, check viewport for Claude Code markers
       if !self.isClaudeRunning {
         let hasMarker = Self.contentMarkers.contains { text.contains($0) }
         guard hasMarker else { return }
@@ -183,6 +172,7 @@ final class ClaudeCodeDetector {
       let lines = text.components(separatedBy: .newlines)
       let recentLines = lines.suffix(30)
       let recentText = recentLines.joined(separator: "\n")
+      let contentHash = recentText.hashValue
 
       let phase = self.classifyPhase(recentText: recentText)
       let context = ClaudeCodeContext(
@@ -191,13 +181,23 @@ final class ClaudeCodeDetector {
         planningText: phase == .thinking ? self.extractThinkingBlock(from: recentText) : ""
       )
 
-      self.setPhase(phase, context: context)
+      // Always notify on phase change
+      if phase != self.currentPhase {
+        self.currentPhase = phase
+        self.lastContentHash = contentHash
+        self.delegate?.claudeCodePhaseDidChange(phase, context: context)
+        return
+      }
+
+      // Also notify when content changes within the same phase
+      if contentHash != self.lastContentHash {
+        self.lastContentHash = contentHash
+        self.delegate?.claudeCodeContextDidUpdate(phase, context: context)
+      }
     }
   }
 
   func classifyPhase(recentText: String) -> ClaudeCodePhase {
-    // Scan from bottom up — the most recent lines determine the current phase.
-    // Old thinking + executing content coexists in the viewport; only the tail matters.
     let lines = recentText.components(separatedBy: .newlines)
 
     for line in lines.reversed() {
@@ -232,11 +232,5 @@ final class ClaudeCodeDetector {
     }
 
     return thinkingLines.joined(separator: "\n")
-  }
-
-  private func setPhase(_ newPhase: ClaudeCodePhase, context: ClaudeCodeContext) {
-    guard newPhase != currentPhase else { return }
-    currentPhase = newPhase
-    delegate?.claudeCodePhaseDidChange(newPhase, context: context)
   }
 }
